@@ -538,6 +538,10 @@
 
         // --- STATE ---
         let timerState = { running: false, totalSeconds: 150, currentSeconds: 150, interval: null };
+        let timerStartTime = null;   // Date.now() when timer started
+        let timerStartSeconds = 0;   // seconds remaining when timer started
+        let lastTickSecond = -1;     // last second we broadcast/acted on
+        let endSequenceCalled = false;
         let scheduleData = [];
         let currentMatchIndex = -1;
         let isNextVisible = false;
@@ -650,15 +654,30 @@
                     send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
                 }
 
+                // Timestamp-based countdown — self-corrects every 100ms regardless
+                // of tab throttling or interval drift.
+                timerStartTime = Date.now();
+                timerStartSeconds = timerState.currentSeconds;
+                lastTickSecond = timerState.currentSeconds;
+                endSequenceCalled = false;
+
                 timerState.interval = setInterval(() => {
-                    if (timerState.currentSeconds > 0) {
-                        timerState.currentSeconds--;
-                        updateTimerDisplay();
+                    const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
+                    const s = Math.max(0, timerStartSeconds - elapsed);
+                    timerState.currentSeconds = s;
+                    updateTimerDisplay();
+
+                    // Only broadcast + trigger events when the second actually changes
+                    if (s !== lastTickSecond) {
+                        lastTickSecond = s;
                         broadcastTimer();
-                        if (timerState.currentSeconds === 30) send('sound', 'play', { sound: 'warning30' });
+                        if (s === 30) send('sound', 'play', { sound: 'warning30' });
+                        if (s === 0 && !endSequenceCalled) {
+                            endSequenceCalled = true;
+                            endMatchSequence();
+                        }
                     }
-                    if (timerState.currentSeconds === 0) endMatchSequence();
-                }, 1000);
+                }, 100);
                 broadcastTimer();
             }
         });

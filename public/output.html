@@ -310,7 +310,9 @@
         const socket = io();
         let timerVisible = false;
         let previousSeconds = -1; let wasRunning = false; let hasPlayed30sWarning = false;
-        let localSeconds = 0; let localRunning = false; let localCountdown = null;
+        // Timestamp-based interpolation — avoids drift from setInterval(fn, 1000)
+        let serverSeconds = 0; let serverReceivedAt = 0; let serverRunning = false;
+        let displayInterval = null;
         const audioElements = { start: new Audio('/start.mp3'), warning30: new Audio('/warning30.mp3'), end: new Audio('/end.mp3'), reset: new Audio() };
 
         // --- RECOVERY LOGIC ---
@@ -385,49 +387,44 @@
             }
         });
 
-                   function handleTimer(d) {
+        function handleTimer(d) {
             const c = document.getElementById('timerContainer'), v = document.getElementById('timerValue');
-            
-            // Reset tracking on first update
-            if(previousSeconds===-1) previousSeconds=d.seconds;
-            
-            // Visibility Logic
-            if(!timerVisible && d.running) { 
-                timerVisible=true; 
-                c.classList.add('visible'); 
-            }
 
-            // Show server value immediately (authoritative resync)
-            v.textContent=formatTime(d.seconds);
-            localSeconds = d.seconds;
-            localRunning = d.running;
+            if (previousSeconds === -1) previousSeconds = d.seconds;
 
-            // Restart local countdown so display stays smooth between server updates.
-            // Each server update resets this interval; if a packet is delayed the
-            // local tick fills the gap instead of the display freezing.
-            if (localCountdown) { clearInterval(localCountdown); localCountdown = null; }
+            // Visibility
+            if (!timerVisible && d.running) { timerVisible = true; c.classList.add('visible'); }
+
+            // Store server state with wall-clock timestamp for interpolation
+            serverSeconds = d.seconds;
+            serverReceivedAt = Date.now();
+            serverRunning = d.running;
+
+            // Show authoritative value immediately
+            v.textContent = formatTime(d.seconds);
+
+            // (Re)start 100ms display interpolator — computes elapsed time from
+            // wall clock so display stays accurate even if server packets are delayed.
+            if (displayInterval) { clearInterval(displayInterval); displayInterval = null; }
             if (d.running && d.seconds > 0) {
-                localCountdown = setInterval(() => {
-                    if (localRunning && localSeconds > 0) {
-                        localSeconds--;
-                        document.getElementById('timerValue').textContent = formatTime(localSeconds);
-                    } else {
-                        clearInterval(localCountdown);
-                        localCountdown = null;
-                    }
-                }, 1000);
+                displayInterval = setInterval(() => {
+                    if (!serverRunning) { clearInterval(displayInterval); displayInterval = null; return; }
+                    const elapsed = Math.floor((Date.now() - serverReceivedAt) / 1000);
+                    const display = Math.max(0, serverSeconds - elapsed);
+                    v.textContent = formatTime(display);
+                    if (display === 0) { clearInterval(displayInterval); displayInterval = null; }
+                }, 100);
             }
 
             // Sound Logic
-            if(d.running && !wasRunning) { 
-                playSound('start'); 
-                hasPlayed30sWarning=false; 
-                // Hide "Up Next" overlay when match actually starts
-                document.getElementById('nextMatchOverlay').classList.remove('visible'); 
+            if (d.running && !wasRunning) {
+                playSound('start');
+                hasPlayed30sWarning = false;
+                document.getElementById('nextMatchOverlay').classList.remove('visible');
             }
-            if(d.running && d.seconds<=30 && previousSeconds>30 && !hasPlayed30sWarning) { 
-                playSound('warning30'); 
-                hasPlayed30sWarning=true; 
+            if (d.running && d.seconds <= 30 && previousSeconds > 30 && !hasPlayed30sWarning) {
+                playSound('warning30');
+                hasPlayed30sWarning = true;
             }
 
             // Logic for when timer hits 0
