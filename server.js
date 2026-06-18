@@ -23,7 +23,9 @@ let lastKnownState = {
     lowerThird: null,
     teamIntro: null,
     award: null,
-    bg: '#0a0e17'
+    bg: '#0a0e17',
+    schedule: [],
+    currentMatchIndex: -1
 };
 
 // NEW: Match History for Ticker
@@ -53,6 +55,22 @@ io.on('connection', (socket) => {
         
         // Broadcast to everyone else
         socket.broadcast.emit('graphics-update', msg);
+    });
+
+    // --- SCHEDULE SYNC ---
+    socket.on('set-schedule', (data) => {
+        lastKnownState.schedule = data.schedule || [];
+        lastKnownState.currentMatchIndex = data.currentMatchIndex ?? -1;
+        // Push to every other connected client
+        socket.broadcast.emit('schedule-update', {
+            schedule: lastKnownState.schedule,
+            currentMatchIndex: lastKnownState.currentMatchIndex
+        });
+    });
+
+    socket.on('set-match-index', (index) => {
+        lastKnownState.currentMatchIndex = index;
+        socket.broadcast.emit('match-index-update', index);
     });
 
     // --- NEW: MATCH HISTORY LOGIC ---

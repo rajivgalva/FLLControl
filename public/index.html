@@ -504,25 +504,65 @@
         socket.on('connect', () => {
             document.getElementById('connStatus').classList.add('active');
             document.getElementById('connStatusText').textContent = 'Connected';
-            // Reload state if available
-            const savedSchedule = localStorage.getItem('fll_schedule');
-            if(savedSchedule && scheduleData.length === 0) {
-                try {
-                    scheduleData = JSON.parse(savedSchedule);
-                    renderSchedule();
-                    updateScoreEntryDropdown();
-                    const savedIndex = localStorage.getItem('fll_match_index');
-                    if(savedIndex !== null) selectMatch(parseInt(savedIndex));
-                } catch(e) {}
-            }
         });
         socket.on('disconnect', () => {
             document.getElementById('connStatus').classList.remove('active');
             document.getElementById('connStatusText').textContent = 'Disconnected';
         });
 
+        // Restore schedule from server on connect (primary) or localStorage (fallback)
+        socket.on('state-recover', (state) => {
+            if (state.schedule && state.schedule.length > 0) {
+                applySchedule(state.schedule, state.currentMatchIndex ?? 0);
+            } else {
+                const saved = localStorage.getItem('fll_schedule');
+                if (saved && scheduleData.length === 0) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        const idx = parseInt(localStorage.getItem('fll_match_index') || '0');
+                        applySchedule(parsed, idx);
+                        // Push localStorage schedule up to server so other clients get it
+                        socket.emit('set-schedule', { schedule: parsed, currentMatchIndex: idx });
+                    } catch(e) {}
+                }
+            }
+        });
+
+        // Another client loaded a schedule — sync it here too
+        socket.on('schedule-update', (data) => {
+            applySchedule(data.schedule, data.currentMatchIndex ?? 0);
+        });
+
+        // Another client changed the active match
+        socket.on('match-index-update', (index) => {
+            if (index !== currentMatchIndex) selectMatchSilent(index);
+        });
+
         function send(type, action, data) {
             socket.emit('graphics-update', { type, action, data });
+        }
+
+        // Apply a schedule array and select a match index — used by both
+        // local load and server sync so the logic lives in one place.
+        function applySchedule(data, matchIndex) {
+            scheduleData = data;
+            currentMatchIndex = -1;
+            renderSchedule();
+            updateScoreEntryDropdown();
+            if (scheduleData.length > 0) selectMatch(Math.min(matchIndex, scheduleData.length - 1));
+        }
+
+        // Select a match that arrived from another client — updates local state
+        // without re-broadcasting the index back to the server (avoids loops).
+        function selectMatchSilent(index) {
+            if (index < 0 || index >= scheduleData.length) return;
+            currentMatchIndex = index;
+            saveState();
+            renderSchedule();
+            document.getElementById('currentMatchLabel').textContent = `Match ${scheduleData[index].match} (${scheduleData[index].time})`;
+            updateMatchControlTab();
+            loadScoreEntry(index);
+            updateMatchCounter();
         }
 
         // Tab Navigation
@@ -754,6 +794,8 @@
                 updateScoreEntryDropdown();
                 if (scheduleData.length > 0) selectMatch(0);
                 saveState();
+                // Push to server so all other connected clients receive it
+                socket.emit('set-schedule', { schedule: scheduleData, currentMatchIndex: currentMatchIndex });
                 alert(`Loaded ${scheduleData.length} blocks.`);
             } catch (e) { alert("Error: " + e.message); }
         }
@@ -778,6 +820,8 @@
             updateMatchControlTab();
             loadScoreEntry(index);
             updateMatchCounter();
+            // Keep server in sync so other clients track the active match
+            socket.emit('set-match-index', index);
         }
 
         function updateMatchCounter() {
