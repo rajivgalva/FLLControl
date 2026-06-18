@@ -51,16 +51,16 @@
         /* Current Match Bar (Bottom) */
         .current-match-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 90; opacity: 0; transform: translateY(100%); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); display: flex; justify-content: center; padding: 0 40px 24px; pointer-events: none; }
         .current-match-bar.visible { opacity: 1; transform: translateY(0); }
-        .current-match-content { background: rgba(17, 24, 39, 0.97); border-radius: 16px; border: 1px solid rgba(255,255,255,0.15); padding: 22px 48px 26px; display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .current-match-content { background: rgba(17, 24, 39, 0.97); border-radius: 16px; border: 1px solid rgba(255,255,255,0.15); padding: 18px 24px 22px; display: flex; flex-direction: column; align-items: center; width: 100%; }
         .current-match-header { display: flex; align-items: center; gap: 28px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 14px; width: 100%; justify-content: center; }
         .current-match-title { font-family: 'Inter', sans-serif; font-size: 1.6rem; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 0.1em; }
         .current-match-time { font-family: 'Inter', sans-serif; font-size: 1.6rem; font-weight: 600; color: var(--accent); }
 
-        .match-list { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; width: 100%; }
-        .match-row { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; background: rgba(255,255,255,0.08); border-radius: 14px; border: 2px solid rgba(255,255,255,0.22); padding: 18px 28px; flex: 1; min-width: 320px; max-width: 520px; }
-        .match-table-name { font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 0; }
-        .match-teams { font-size: 1.7rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
-        .match-separator { margin: 0 12px; color: rgba(255,255,255,0.4); font-size: 1.1rem; font-weight: 600; }
+        .match-list { display: flex; flex-wrap: nowrap; gap: 12px; justify-content: center; width: 100%; }
+        .match-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; background: rgba(255,255,255,0.08); border-radius: 14px; border: 2px solid rgba(255,255,255,0.22); padding: 14px 20px; flex: 1; min-width: 0; overflow: hidden; }
+        .match-table-name { font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+        .match-team { font-size: 1.25rem; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .match-separator { margin: 2px 0; color: rgba(255,255,255,0.35); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 
         /* Next Match Interstitial (Center) */
         /* Next Match Interstitial — transparent so chroma key shows through */
@@ -459,7 +459,7 @@
             const l=document.getElementById(id); l.innerHTML='';
             tables.forEach(t => {
                 const r=document.createElement('div'); r.className='match-row';
-                r.innerHTML=`<span class="match-table-name">${t.name}</span><span class="match-teams">${t.team1} <span class="match-separator">vs</span> ${t.team2}</span>`;
+                r.innerHTML=`<span class="match-table-name">${t.name}</span><span class="match-team">${t.team1}</span><span class="match-separator">vs</span><span class="match-team">${t.team2}</span>`;
                 l.appendChild(r);
             });
         }

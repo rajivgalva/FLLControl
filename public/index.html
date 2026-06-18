@@ -559,7 +559,7 @@
             currentMatchIndex = index;
             saveState();
             renderSchedule();
-            document.getElementById('currentMatchLabel').textContent = `Match ${scheduleData[index].match} (${scheduleData[index].time})`;
+            document.getElementById('currentMatchLabel').textContent = `${matchLabel(scheduleData[index])} (${scheduleData[index].time})`;
             updateMatchControlTab();
             loadScoreEntry(index);
             updateMatchCounter();
@@ -617,6 +617,9 @@
             }
         }
 
+        // Returns a human-readable label: "Match 11" or "Practice"
+        function matchLabel(m) { return m.practice ? 'Practice' : `Match ${m.match}`; }
+
         function updateMatchControlTab() {
             const label = document.getElementById('mc-matchLabel');
             const teamsDiv = document.getElementById('mc-matchTeams');
@@ -627,7 +630,7 @@
                 return;
             }
             const m = scheduleData[currentMatchIndex];
-            label.textContent = `Match ${m.match} — ${m.time}`;
+            label.textContent = `${matchLabel(m)} — ${m.time}`;
             teamsDiv.innerHTML = m.tables.map(t => `
                 <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
                     <span style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.06em;">${t.name}</span>
@@ -642,7 +645,7 @@
             const current = sel.value;
             sel.innerHTML = scheduleData.length === 0
                 ? '<option value="">— Load a schedule first —</option>'
-                : scheduleData.map((m, i) => `<option value="${i}">Match ${m.match} — ${m.time}</option>`).join('');
+                : scheduleData.map((m, i) => `<option value="${i}">${matchLabel(m)} — ${m.time}</option>`).join('');
             if (current !== '' && scheduleData[parseInt(current)]) sel.value = current;
         }
 
@@ -653,7 +656,7 @@
             const sel = document.getElementById('se-matchSelect');
             if (sel) sel.value = index;
             const label = document.getElementById('se-matchLabel');
-            if (label) label.textContent = `Match ${m.match} — ${m.time}`;
+            if (label) label.textContent = `${matchLabel(m)} — ${m.time}`;
             const container = document.getElementById('scoreInputsContainer');
             container.innerHTML = '';
             m.tables.forEach((t, idx) => {
@@ -726,32 +729,12 @@
             clearInterval(timerState.interval);
             timerState.running = false;
             timerStatus.classList.remove('active');
-            
+
             send('sound', 'play', { sound: 'end' });
-            
-            // Auto Advance logic — 3s delay before showing Up Next
-            if (currentMatchIndex < scheduleData.length - 1) {
-                const nextIdx = currentMatchIndex + 1;
-                selectMatch(nextIdx);
 
-                upNextTimeout = setTimeout(() => {
-                    upNextTimeout = null;
-                    const m = scheduleData[nextIdx];
-                    send('currentMatch', 'hide');
-                    send('nextMatchInterstitial', 'show', { match: m.match, time: m.time, tables: m.tables });
-                    isNextVisible = true;
-                    upNextDisplayIndex = nextIdx;
-                }, 3000);
-            }
-
-            // NEW: Automatically reset timer for the next match
-            // This updates the control panel UI and prepares the timer
-            timerState.totalSeconds = (parseInt(document.getElementById('timerMinutes').value) || 0) * 60 + (parseInt(document.getElementById('timerSeconds').value) || 30);
-            timerState.currentSeconds = timerState.totalSeconds;
-            updateTimerDisplay();
-            
-            // Broadcast the reset state (0 seconds running=false is handled by timer update)
-            // Note: We do not broadcast 'timerVisibility: show' here, we wait for the user to start.
+            // Do NOT auto-advance or show Up Next — with multiple operator computers
+            // this would fire on both machines and cause double-triggers.
+            // Operators use Queue Match manually to set up the next round.
         }
 
         document.getElementById('timerStop').addEventListener('click', () => {
@@ -775,24 +758,30 @@
             try {
                 const data = JSON.parse(document.getElementById('scheduleJson').value);
                 if (!Array.isArray(data)) throw new Error("Must be array.");
-                scheduleData = []; let mc = 1;
+                scheduleData = [];
                 data.forEach(slot => {
                     if (!slot.Time) return;
                     const rawTime = slot.Time.trim();
                     // Extract just the HH:MM AM/PM portion — drop any date prefix
                     const timeMatch = rawTime.match(/\d{1,2}:\d{2}\s*[AP]M/i);
                     const time = timeMatch ? timeMatch[0] : rawTime;
+                    const isPractice = slot.Practice === true;
+                    // Use explicit Match number from JSON; practice rounds get labelled "Practice"
+                    const matchNum = isPractice ? 'Practice' : (slot.Match != null ? slot.Match : '?');
                     const tables = [];
+                    // Skip meta fields — only scan for table columns (end with " A")
+                    const SKIP = new Set(["Time", "Practice", "Match"]);
                     Object.keys(slot).forEach(key => {
-                        if (key === "Time") return;
+                        if (SKIP.has(key)) return;
                         if (key.endsWith(" A")) {
                             const tName = key.substring(0, key.length - 2).trim();
-                            const tA = String(slot[key]).trim();
-                            const tB = slot[key.replace(" A", " B")] ? String(slot[key.replace(" A", " B")]).trim() : "";
+                            const rawA = slot[key], rawB = slot[key.replace(" A", " B")];
+                            const tA = rawA != null ? String(rawA).trim() : "";
+                            const tB = rawB != null ? String(rawB).trim() : "";
                             if (tA && tB) tables.push({ name: tName, team1: tA, team2: tB });
                         }
                     });
-                    if (tables.length > 0) scheduleData.push({ match: mc++, time: time, tables: tables });
+                    if (tables.length > 0) scheduleData.push({ match: matchNum, time: time, tables: tables, practice: isPractice });
                 });
                 currentMatchIndex = -1; renderSchedule();
                 updateScoreEntryDropdown();
@@ -810,7 +799,8 @@
             scheduleData.forEach((m, i) => {
                 const item = document.createElement('div');
                 item.className = 'schedule-item' + (i === currentMatchIndex ? ' active' : '');
-                item.innerHTML = `<span class="schedule-time">Match ${m.match}</span><div style="flex:1;"><div style="font-weight: 600;">${m.time}</div><div class="schedule-sub">Tables: ${m.tables.map(t=>t.name).join(', ')}</div></div>`;
+                const label = m.practice ? 'Practice' : `Match ${m.match}`;
+                item.innerHTML = `<span class="schedule-time">${label}</span><div style="flex:1;"><div style="font-weight: 600;">${m.time}</div><div class="schedule-sub">Tables: ${m.tables.map(t=>t.name).join(', ')}</div></div>`;
                 item.onclick = () => selectMatch(i);
                 list.appendChild(item);
             });
@@ -820,7 +810,7 @@
         function selectMatch(index) {
             if (index < 0 || index >= scheduleData.length) return;
             currentMatchIndex = index; saveState(); renderSchedule();
-            document.getElementById('currentMatchLabel').textContent = `Match ${scheduleData[index].match} (${scheduleData[index].time})`;
+            document.getElementById('currentMatchLabel').textContent = `${matchLabel(scheduleData[index])} (${scheduleData[index].time})`;
             updateMatchControlTab();
             loadScoreEntry(index);
             updateMatchCounter();
