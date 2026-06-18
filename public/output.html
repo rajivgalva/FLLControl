@@ -206,6 +206,13 @@
     </style>
 </head>
 <body>
+    <!-- Audio activation gate — required by browser autoplay policy -->
+    <div id="audioGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);">
+        <button id="audioGateBtn" style="background:#CC1F2D;color:white;border:none;border-radius:12px;padding:20px 40px;font-family:Inter,sans-serif;font-size:1.4rem;font-weight:700;cursor:pointer;letter-spacing:0.02em;">
+            🔊 Click to Enable Audio
+        </button>
+    </div>
+
     <!-- Wrapper for Scaling -->
     <div id="scaled-root">
         <div class="bg-layer"></div>
@@ -335,6 +342,22 @@
         // ---------------------
 
         const isPreview = window.self !== window.top;
+
+        // Unlock audio on first user gesture (required by browser autoplay policy)
+        const audioGate = document.getElementById('audioGate');
+        if (isPreview) {
+            // Don't show gate in iframe preview
+            audioGate.style.display = 'none';
+        } else {
+            document.getElementById('audioGateBtn').addEventListener('click', () => {
+                // Prime all audio elements so they can play without a gesture later
+                Object.values(audioElements).forEach(a => {
+                    if (a.src) { a.volume = 0; a.play().catch(() => {}); setTimeout(() => { a.pause(); a.currentTime = 0; a.volume = 1; }, 100); }
+                });
+                audioGate.style.display = 'none';
+            });
+        }
+
         function playSound(k) { if(isPreview) return; const a = audioElements[k]; if(a.src) { a.currentTime=0; a.play().catch(e=>{}); } }
         function formatTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
 
