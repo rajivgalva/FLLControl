@@ -778,7 +778,11 @@
                 scheduleData = []; let mc = 1;
                 data.forEach(slot => {
                     if (!slot.Time) return;
-                    const time = slot.Time.trim(); const tables = [];
+                    const rawTime = slot.Time.trim();
+                    // Extract just the HH:MM AM/PM portion — drop any date prefix
+                    const timeMatch = rawTime.match(/\d{1,2}:\d{2}\s*[AP]M/i);
+                    const time = timeMatch ? timeMatch[0] : rawTime;
+                    const tables = [];
                     Object.keys(slot).forEach(key => {
                         if (key === "Time") return;
                         if (key.endsWith(" A")) {
