@@ -37,12 +37,15 @@
         /* Timer */
         .timer-container { position: absolute; top: 30px; right: 30px; z-index: 100; opacity: 0; transform: translateX(100px); transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
         .timer-container.visible { opacity: 1; transform: translateX(0); }
-        .timer-box { background: rgba(26, 34, 53, 0.95); border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 20px; padding: 28px 56px; display: flex; align-items: center; gap: 20px; }
-        .timer-label { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
-        .timer-value { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; min-width: 320px; text-align: center; }
-        .timer-container.warning .timer-value { color: var(--accent); }
-        .timer-container.danger .timer-value { color: var(--danger); animation: timerPulse 0.5s infinite; }
-        .timer-container.running .timer-box { border-color: rgba(255, 255, 255, 0.9); }
+        .timer-box { background: #ffffff; border: 3px solid rgba(255,255,255,0.9); border-radius: 20px; padding: 28px 56px; display: flex; align-items: center; gap: 20px; transition: background 0.4s ease; }
+        .timer-label { font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #555; transition: color 0.4s ease; }
+        .timer-value { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 800; color: #111; letter-spacing: -0.02em; min-width: 320px; text-align: center; transition: color 0.4s ease; }
+        .timer-container.warning .timer-box { background: #ffffff; }
+        .timer-container.warning .timer-value { color: #111; }
+        .timer-container.danger .timer-box { background: var(--accent); border-color: var(--accent); }
+        .timer-container.danger .timer-label { color: rgba(255,255,255,0.8); }
+        .timer-container.danger .timer-value { color: #ffffff; animation: timerPulse 0.5s infinite; }
+        .timer-container.running .timer-box { border-color: rgba(255,255,255,0.9); }
         @keyframes timerPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         /* Current Match Bar (Bottom) */
