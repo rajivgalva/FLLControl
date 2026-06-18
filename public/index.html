@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLL Graphics Control</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fa; --bg-secondary: #ffffff; --bg-card: #ffffff; --border: #e2e8f0;
+            --text-primary: #1a202c; --text-secondary: #718096; --accent: #3b82f6; --accent-light: #eff6ff;
+            --success: #16a34a; --success-light: #f0fdf4; --danger: #dc2626; --danger-light: #fef2f2;
+            --teal: #0d9488; --teal-light: #f0fdfa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        .header { padding: 16px 24px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .header-left h1 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+        .header-left p { color: var(--text-secondary); font-size: 0.8rem; margin-top: 2px; }
+        .connection-status { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 20px; font-size: 0.8rem; color: var(--text-secondary); }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); transition: background 0.3s; }
+        .status-dot.active { background: var(--success); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .tabs-container { display: flex; background: var(--bg-secondary); border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tab-btn { flex: 1; min-width: 100px; padding: 14px 20px; background: transparent; border: none; color: var(--text-secondary); font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; position: relative; transition: color 0.2s; white-space: nowrap; }
+        .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active { color: var(--accent); }
+        .tab-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
+
+        .tab-content { display: none; padding: 20px; }
+        .tab-content.active { display: block; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; max-width: 1800px; margin: 0 auto; }
+        .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); }
+        .panel-header h2 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-secondary); }
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; transition: all 0.3s; }
+        .status-indicator.active { background: var(--success); }
+
+        .panel-body { padding: 18px; flex: 1; overflow-y: auto; }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 5px; }
+
+        input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 9px 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 0.9rem; transition: border-color 0.2s, box-shadow 0.2s; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        textarea { min-height: 80px; resize: vertical; }
+
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn { flex: 1; min-width: 80px; padding: 9px 16px; border: none; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #15803d; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-secondary { background: white; border: 1px solid var(--border); color: var(--text-primary); }
+        .btn-secondary:hover { background: var(--bg-primary); }
+        .btn-cyan { background: var(--teal); color: white; }
+        .btn-cyan:hover { background: #0f766e; }
+        .btn-small { padding: 6px 10px; font-size: 0.78rem; flex: 0; }
+
+        .timer-display { font-family: 'Inter', sans-serif; font-size: 3.5rem; font-weight: 700; text-align: center; padding: 28px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border); letter-spacing: -0.02em; color: var(--text-primary); }
+        .timer-display.running { border-color: var(--success); background: var(--success-light); color: var(--success); }
+        .timer-display.warning { border-color: #f59e0b; background: #fffbeb; color: #b45309; animation: timerPulse 1s infinite; }
+        .timer-display.danger { border-color: var(--danger); background: var(--danger-light); color: var(--danger); animation: timerPulse 0.5s infinite; }
+        @keyframes timerPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .time-inputs { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+        .time-inputs input { width: 72px; text-align: center; }
+
+        .settings-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .settings-section h3 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-secondary); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+        .chroma-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .chroma-preset { width: 52px; height: 52px; border-radius: 6px; border: 2px solid var(--border); cursor: pointer; transition: all 0.15s; position: relative; }
+        .chroma-preset:hover { transform: scale(1.05); }
+        .chroma-preset.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+        .chroma-preset.active::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: white; text-shadow: 0 0 4px rgba(0,0,0,0.8); }
+        .preset-green { background: #00ff00; } .preset-blue { background: #0000ff; } .preset-dark { background: #0a0e17; } .preset-white { background: #ffffff; border-color: #d1d5db; }
+
+        .custom-color-row { display: flex; gap: 8px; align-items: center; }
+        .custom-color-row input[type="color"] { width: 52px; height: 40px; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: white; }
+
+        .file-input-wrapper { position: relative; margin-bottom: 8px; }
+        .file-input-wrapper input[type="file"] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .file-input-label { display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); border: 1px dashed var(--border); border-radius: 6px; padding: 10px 12px; transition: all 0.2s; }
+        .file-input-wrapper:hover .file-input-label { border-color: var(--accent); background: var(--accent-light); }
+        .file-name { font-size: 0.85rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+        .file-name.loaded { color: var(--success); }
+
+        .schedule-list { max-height: 400px; overflow-y: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+        .schedule-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+        .schedule-item:last-child { border-bottom: none; }
+        .schedule-item:hover { background: var(--bg-primary); }
+        .schedule-item.active { background: var(--accent-light); border-left: 3px solid var(--accent); }
+        .schedule-item.active .schedule-time { color: var(--accent); }
+        .schedule-item.active .schedule-sub { color: var(--text-secondary); }
+        .schedule-time { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; display: block; }
+        .schedule-sub { font-size: 0.8rem; color: var(--text-secondary); }
+
+        .schedule-nav { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+        .schedule-nav span { flex: 1; text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+
+        .json-help { background: var(--bg-primary); border-radius: 6px; padding: 12px; margin-top: 8px; font-family: monospace; font-size: 0.78rem; color: var(--text-secondary); white-space: pre; overflow-x: auto; border: 1px solid var(--border); }
+
+        .score-table-container { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; max-height: 300px; overflow-y: auto; padding-right: 4px; }
+        .score-table-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+        .score-table-header { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        .score-row { display: grid; grid-template-columns: 1fr 70px 20px 70px 1fr; gap: 8px; align-items: center; }
+        .score-row input { text-align: center; padding: 8px; }
+        .score-vs { color: var(--text-secondary); text-align: center; font-weight: 600; font-size: 0.8rem; }
+
+        .preview-frame { width: 100%; height: 100%; border: none; border-radius: 6px; background: #000; }
+
+        .aspect-ratio-box { width: 100%; position: relative; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+        .aspect-ratio-box::before { content: ""; display: block; padding-top: 56.25%; }
+        .aspect-ratio-box iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        @media (max-width: 768px) {
+            .header { padding: 12px 16px; }
+            .timer-display { font-size: 2.5rem; padding: 20px; }
+            .tab-btn { padding: 12px 14px; min-width: 90px; }
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        #match-tab .grid { grid-template-columns: 300px 1fr 450px; }
+        #match-tab .preview-panel-container { height: 280px; overflow: hidden; }
+
+        @media (max-width: 1200px) {
+            #match-tab .grid { grid-template-columns: 1fr 1fr; }
+            #match-tab .preview-panel-container { grid-column: span 2; height: 350px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>FLL Graphics Control</h1>
+            <p>Broadcast Channel Active</p>
+        </div>
+        <div class="header-right">
+            <div class="connection-status">
+                <div class="status-dot" id="connStatus"></div>
+                <span id="connStatusText">Connecting...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs-container">
+        <button class="tab-btn active" data-tab="match-control">Match Control</button>
+        <button class="tab-btn" data-tab="score-entry">Score Entry</button>
+        <button class="tab-btn" data-tab="schedule">Schedule</button>
+        <button class="tab-btn" data-tab="teams">Teams & Awards</button>
+        <button class="tab-btn" data-tab="overlays">Overlays</button>
+        <button class="tab-btn" data-tab="settings">Settings</button>
+        <button class="tab-btn" data-tab="history">History</button>
+    </div>
+
+    <!-- Match Control Tab (Operator View) -->
+    <div class="tab-content active" id="match-control-tab">
+        <!-- Match Info Header -->
+        <div class="panel" style="margin-bottom: 16px;">
+            <div class="panel-header">
+                <h2>Now Playing</h2>
+                <span id="mc-matchLabel" style="font-weight: 700; font-size: 0.9rem; color: var(--accent);">None Selected</span>
+            </div>
+            <div class="panel-body" style="padding: 14px 18px;">
+                <div id="mc-matchTeams" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Load a schedule and select a match.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main layout: controls left, preview right -->
+        <div style="display: grid; grid-template-columns: 1fr 480px; gap: 16px; align-items: start;">
+            <!-- Left: controls -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <!-- Timer -->
+                    <div class="panel">
+                        <div class="panel-header"><h2>Match Timer</h2></div>
+                        <div class="panel-body">
+                            <div class="timer-display" id="mc-timerDisplay">02:30</div>
+                            <div class="btn-group" style="margin-top: 14px;">
+                                <button class="btn btn-success" id="mc-timerStart">Start</button>
+                                <button class="btn btn-danger" id="mc-timerStop">Stop</button>
+                                <button class="btn btn-secondary" id="mc-timerReset">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Match Flow -->
+                    <div class="panel">
+                        <div class="panel-header"><h2>Match Flow</h2></div>
+                        <div class="panel-body" style="display: flex; flex-direction: column; gap: 10px;">
+                            <button class="btn btn-success" id="mc-queueMatch" style="padding: 11px;">Queue Match</button>
+                            <button class="btn btn-primary" id="mc-scoreToggle" style="padding: 11px;">Show Score</button>
+                            <div class="btn-group">
+                                <button class="btn btn-cyan" id="mc-showTimer">Show Timer</button>
+                                <button class="btn btn-secondary" id="mc-hideTimer">Hide Timer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Controls -->
+                <div class="panel">
+                    <div class="panel-header"><h2>Display Controls</h2></div>
+                    <div class="panel-body" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div>
+                            <label>Current Match Bar</label>
+                            <div class="btn-group" style="margin-top: 8px;">
+                                <button class="btn btn-cyan" id="mc-showCurrent">Show Current</button>
+                                <button class="btn btn-secondary" id="mc-hideCurrent">Hide Current</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label>Next Match Overlay</label>
+                            <div class="btn-group" style="margin-top: 8px;">
+                                <button class="btn btn-primary" id="mc-showNext">Show Next Match</button>
+                                <button class="btn btn-secondary" id="mc-hideNext">Hide Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Live Preview -->
+            <div class="panel" style="height: fit-content;">
+                <div class="panel-header"><h2>Live Preview</h2></div>
+                <div class="panel-body" style="padding: 10px;">
+                    <div class="aspect-ratio-box">
+                        <iframe id="previewFrame" src="/output"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Score Entry Tab -->
+    <div class="tab-content" id="score-entry-tab">
+        <div style="max-width: 800px; margin: 0 auto;">
+            <!-- Hidden timer elements still needed by JS -->
+            <div style="display:none;">
+                <div id="timerDisplay">02:30</div>
+                <div class="status-indicator" id="timerStatus"></div>
+                <button id="timerStart"></button>
+                <button id="timerStop"></button>
+                <button id="timerReset"></button>
+                <input type="number" id="timerMinutes" value="2">
+                <input type="number" id="timerSeconds" value="30">
+                <div class="status-indicator" id="scoreStatus"></div>
+                <span id="currentMatchLabel"></span>
+                <button id="scoreToggle"></button>
+                <button id="showCurrentMatch"></button>
+                <button id="hideCurrentMatch"></button>
+                <button id="showNextMatch"></button>
+                <button id="hideNextMatch"></button>
+                <button id="queueMatchBtn"></button>
+            </div>
+
+            <!-- Match Picker -->
+            <div class="panel" style="margin-bottom: 16px;">
+                <div class="panel-header">
+                    <h2>Select Match</h2>
+                    <span id="se-refSync" style="font-size: 0.8rem; color: var(--success);"></span>
+                </div>
+                <div class="panel-body">
+                    <select id="se-matchSelect" style="font-size: 1rem; padding: 10px 12px;">
+                        <option value="">— Load a schedule first —</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Score Entry -->
+            <div class="panel" style="margin-bottom: 16px;">
+                <div class="panel-header">
+                    <h2>Scores</h2>
+                    <span id="se-matchLabel" style="font-weight: 700; color: var(--accent); font-size: 0.85rem;"></span>
+                </div>
+                <div class="panel-body">
+                    <div class="score-table-container" id="scoreInputsContainer">
+                        <div style="color: var(--text-secondary); text-align: center; padding: 20px;">Select a match above to enter scores.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="panel">
+                <div class="panel-header"><h2>Actions</h2></div>
+                <div class="panel-body" style="display: flex; flex-direction: column; gap: 10px;">
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="se-showScore">Show Score on Output</button>
+                        <button class="btn btn-secondary" id="se-hideScore">Hide Score</button>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-success" id="commitMatchBtn">Save Result to History</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Tab -->
+    <div class="tab-content" id="schedule-tab">
+        <div class="grid">
+            <div class="panel">
+                <div class="panel-header"><h2>Import Schedule</h2></div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label>Schedule JSON Data</label>
+                        <textarea id="scheduleJson" placeholder="Paste JSON array here..." style="height: 200px; font-family: monospace;"></textarea>
+                    </div>
+                    <button class="btn btn-secondary" id="toggleHelp" style="margin-bottom: 15px; width: 100%;">Show Format Help</button>
+                    <div id="jsonHelp" style="display: none; background: var(--bg-secondary); border-radius: 8px; padding: 15px; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary); white-space: pre; overflow-x: auto;">
+[
+  {
+    "Time": " 9:00 AM",
+    "Table 1 A": " 346 ",
+    "Table 1 B": " 45059 ",
+    ...
+  }
+]</div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="loadSchedule">Load Schedule</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>Match Blocks</h2></div>
+                <div class="panel-body">
+                    <div class="schedule-list" id="scheduleList"><div style="padding: 20px; text-align: center; color: var(--text-secondary);">No schedule loaded.</div></div>
+                    <div class="schedule-nav">
+                        <button class="btn btn-secondary btn-small" id="prevMatch">Prev</button>
+                        <span id="matchCounter">0 / 0</span>
+                        <button class="btn btn-primary btn-small" id="nextMatch">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teams & Awards Tab -->
+    <div class="tab-content" id="teams-tab">
+        <div class="grid">
+             <div class="panel">
+                <div class="panel-header"><h2>Team Introduction</h2><div class="status-indicator" id="teamStatus"></div></div>
+                <div class="panel-body">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                        <div class="form-group"><label>Team Name</label><input type="text" id="teamName" placeholder="Enter team name"></div>
+                        <div class="form-group"><label>Team Number</label><input type="text" id="teamNumber" placeholder="12345"></div>
+                    </div>
+                    <div class="form-group"><label>School / Organization</label><input type="text" id="teamOrg" placeholder="Enter organization"></div>
+                    <div class="form-group"><label>Team Members</label><textarea id="teamMembers" placeholder="One per line" style="min-height: 80px;"></textarea></div>
+                    <div class="form-group"><label>Coach</label><input type="text" id="teamCoach" placeholder="Enter coach name"></div>
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <div style="flex:1;"><label>Color 1</label><input type="color" id="teamColor1" value="#ff6b00" style="width:100%; height: 45px; border:none; cursor:pointer;"></div>
+                        <div style="flex:1;"><label>Color 2</label><input type="color" id="teamColor2" value="#00e5ff" style="width:100%; height: 45px; border:none; cursor:pointer;"></div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="teamShow">Show</button>
+                        <button class="btn btn-secondary" id="teamHide">Hide</button>
+                    </div>
+                </div>
+            </div>
+             <div class="panel">
+                <div class="panel-header"><h2>Award Winners</h2><div class="status-indicator" id="awardStatus"></div></div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label>Award Name</label>
+                        <select id="awardName">
+                            <option value="Champions Award">Champions Award</option>
+                            <option value="Robot Game Winner">Robot Game Winner</option>
+                            <option value="Robot Design Award">Robot Design Award</option>
+                            <option value="Core Values Award">Core Values Award</option>
+                            <option value="Project Award">Project Award</option>
+                            <option value="Custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Custom Name</label><input type="text" id="awardCustom" placeholder="Custom name"></div>
+                    <div class="form-group">
+                        <label>Position</label>
+                        <select id="awardPosition">
+                            <option value="1st">1st Place</option>
+                            <option value="2nd">2nd Place</option>
+                            <option value="3rd">3rd Place</option>
+                            <option value="winner">Winner</option>
+                        </select>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
+                        <div class="form-group"><label>Winning Team</label><input type="text" id="awardTeam" placeholder="Team name"></div>
+                        <div class="form-group"><label>Number</label><input type="text" id="awardTeamNum" placeholder="#"></div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="awardShow">Show</button>
+                        <button class="btn btn-secondary" id="awardHide">Hide</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlays Tab -->
+    <div class="tab-content" id="overlays-tab">
+        <div class="grid">
+            <div class="panel">
+                <div class="panel-header"><h2>Lower Third</h2><div class="status-indicator" id="ltStatus"></div></div>
+                <div class="panel-body">
+                    <div class="form-group"><label>Line 1</label><input type="text" id="ltLine1" placeholder="Name/Title"></div>
+                    <div class="form-group"><label>Line 2</label><input type="text" id="ltLine2" placeholder="Subtitle"></div>
+                    <div class="form-group">
+                        <label>Style</label>
+                        <select id="ltStyle">
+                            <option value="default">Default</option>
+                            <option value="highlight">Highlight</option>
+                            <option value="alert">Alert</option>
+                        </select>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="ltShow">Show</button>
+                        <button class="btn btn-secondary" id="ltHide">Hide</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h2>Transitions</h2></div>
+                <div class="panel-body">
+                    <div class="form-group"><label>Event Name</label><input type="text" id="eventName" placeholder="Event name"></div>
+                    <div class="form-group"><label>Bumper Text</label><input type="text" id="bumperText" placeholder="Text"></div>
+                    <div class="btn-group" style="margin-bottom:10px;">
+                        <button class="btn btn-cyan" id="showIntro">Intro</button>
+                        <button class="btn btn-cyan" id="showOutro">Outro</button>
+                    </div>
+                     <div class="btn-group" style="margin-bottom:10px;">
+                        <button class="btn btn-cyan" id="showBumper">Bumper</button>
+                        <button class="btn btn-secondary" id="hideTransition">Hide</button>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="showEvent">Event Title</button>
+                        <button class="btn btn-secondary" id="hideEvent">Hide</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-content" id="settings-tab">
+        <div class="grid">
+            <div class="settings-section">
+                <h3>Sound Effects</h3>
+                 <div class="form-group"><label>Start</label><div class="file-input-wrapper"><input type="file" id="soundStart" accept="audio/mpeg"><div class="file-input-label"><span class="file-name" id="soundStartName">No file</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div></div></div>
+                 <div class="form-group"><label>30s Warning</label><div class="file-input-wrapper"><input type="file" id="sound30s" accept="audio/mpeg"><div class="file-input-label"><span class="file-name" id="sound30sName">No file</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div></div></div>
+                 <div class="form-group"><label>End</label><div class="file-input-wrapper"><input type="file" id="soundEnd" accept="audio/mpeg"><div class="file-input-label"><span class="file-name" id="soundEndName">No file</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div></div></div>
+                 <div class="form-group"><label>Reset</label><div class="file-input-wrapper"><input type="file" id="soundReset" accept="audio/mpeg"><div class="file-input-label"><span class="file-name" id="soundResetName">No file</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div></div></div>
+            </div>
+            <div class="settings-section">
+                <h3>Background</h3>
+                <div class="chroma-presets">
+                    <div class="chroma-preset preset-green" data-color="#00ff00"></div>
+                    <div class="chroma-preset preset-blue" data-color="#0000ff"></div>
+                    <div class="chroma-preset preset-dark active" data-color="#0a0e17"></div>
+                    <div class="chroma-preset preset-white" data-color="#ffffff"></div>
+                </div>
+                <div class="form-group">
+                    <div class="custom-color-row">
+                        <input type="color" id="customBgColor" value="#00ff00">
+                        <input type="text" id="customBgHex" value="#00ff00">
+                        <button class="btn btn-primary" id="applyCustomBg" style="min-width: 80px; flex: 0;">Apply</button>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3>Options</h3>
+                <div class="btn-group"><button class="btn btn-success" id="showTimer">Show Timer</button><button class="btn btn-secondary" id="hideTimer">Hide Timer</button></div>
+                <div class="btn-group" style="margin-top:10px;"><button class="btn btn-danger" id="clearAll" style="flex:1;">Clear All</button></div>
+            </div>
+        </div>
+    </div>
+
+        <!-- History Tab -->
+    <div class="tab-content" id="history-tab">
+        <div class="grid">
+            <div class="panel">
+                <div class="panel-header"><h2>Completed Matches</h2></div>
+                <div class="panel-body">
+                    <div class="btn-group" style="margin-bottom: 15px;">
+                        <button class="btn btn-cyan" id="showTicker">Show Ticker</button>
+                        <button class="btn btn-secondary" id="hideTicker">Hide Ticker</button>
+                        <button class="btn btn-danger" id="clearHistory">Clear All</button>
+                    </div>
+                    <div id="historyLog" style="max-height: 60vh; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // Connection Status UI
+        socket.on('connect', () => {
+            document.getElementById('connStatus').classList.add('active');
+            document.getElementById('connStatusText').textContent = 'Connected';
+            // Reload state if available
+            const savedSchedule = localStorage.getItem('fll_schedule');
+            if(savedSchedule && scheduleData.length === 0) {
+                try {
+                    scheduleData = JSON.parse(savedSchedule);
+                    renderSchedule();
+                    updateScoreEntryDropdown();
+                    const savedIndex = localStorage.getItem('fll_match_index');
+                    if(savedIndex !== null) selectMatch(parseInt(savedIndex));
+                } catch(e) {}
+            }
+        });
+        socket.on('disconnect', () => {
+            document.getElementById('connStatus').classList.remove('active');
+            document.getElementById('connStatusText').textContent = 'Disconnected';
+        });
+
+        function send(type, action, data) {
+            socket.emit('graphics-update', { type, action, data });
+        }
+
+        // Tab Navigation
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tabId = btn.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+
+        // --- STATE ---
+        let timerState = { running: false, totalSeconds: 150, currentSeconds: 150, interval: null };
+        let scheduleData = [];
+        let currentMatchIndex = -1;
+        let isNextVisible = false;
+        let upNextDisplayIndex = -1;
+        let upNextTimeout = null;
+        let scoreVisible = false;
+        let scoreEntryIndex = -1;
+
+        // --- LOCAL STORAGE ---
+        function saveState() {
+            localStorage.setItem('fll_schedule', JSON.stringify(scheduleData));
+            localStorage.setItem('fll_match_index', currentMatchIndex);
+        }
+
+        // --- TIMER LOGIC ---
+        const timerDisplay = document.getElementById('timerDisplay');
+        const timerStatus = document.getElementById('timerStatus');
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(timerState.currentSeconds / 60);
+            const secs = timerState.currentSeconds % 60;
+            const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            const mcDisplay = document.getElementById('mc-timerDisplay');
+            timerDisplay.textContent = timeStr;
+            if (mcDisplay) mcDisplay.textContent = timeStr;
+            timerDisplay.classList.remove('running', 'warning', 'danger');
+            if (mcDisplay) mcDisplay.classList.remove('running', 'warning', 'danger');
+            if (timerState.running) {
+                timerDisplay.classList.add('running');
+                if (mcDisplay) mcDisplay.classList.add('running');
+                if (timerState.currentSeconds <= 30) { timerDisplay.classList.add('danger'); if (mcDisplay) mcDisplay.classList.add('danger'); }
+                else if (timerState.currentSeconds <= 60) { timerDisplay.classList.add('warning'); if (mcDisplay) mcDisplay.classList.add('warning'); }
+            }
+        }
+
+        function updateMatchControlTab() {
+            const label = document.getElementById('mc-matchLabel');
+            const teamsDiv = document.getElementById('mc-matchTeams');
+            if (!label || !teamsDiv) return;
+            if (currentMatchIndex < 0 || !scheduleData[currentMatchIndex]) {
+                label.textContent = 'None Selected';
+                teamsDiv.innerHTML = '<div style="color:var(--text-secondary);font-size:0.9rem;">Load a schedule and select a match.</div>';
+                return;
+            }
+            const m = scheduleData[currentMatchIndex];
+            label.textContent = `Match ${m.match} — ${m.time}`;
+            teamsDiv.innerHTML = m.tables.map(t => `
+                <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                    <span style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.06em;">${t.name}</span>
+                    <span style="font-weight:700;color:var(--text-primary);font-size:1rem;">${t.team1}</span>
+                    <span style="color:var(--text-secondary);font-size:0.85rem;font-weight:600;">vs</span>
+                    <span style="font-weight:700;color:var(--text-primary);font-size:1rem;">${t.team2}</span>
+                </div>`).join('');
+        }
+
+        function updateScoreEntryDropdown() {
+            const sel = document.getElementById('se-matchSelect');
+            const current = sel.value;
+            sel.innerHTML = scheduleData.length === 0
+                ? '<option value="">— Load a schedule first —</option>'
+                : scheduleData.map((m, i) => `<option value="${i}">Match ${m.match} — ${m.time}</option>`).join('');
+            if (current !== '' && scheduleData[parseInt(current)]) sel.value = current;
+        }
+
+        function loadScoreEntry(index) {
+            if (index < 0 || index >= scheduleData.length) return;
+            scoreEntryIndex = index;
+            const m = scheduleData[index];
+            const sel = document.getElementById('se-matchSelect');
+            if (sel) sel.value = index;
+            const label = document.getElementById('se-matchLabel');
+            if (label) label.textContent = `Match ${m.match} — ${m.time}`;
+            const container = document.getElementById('scoreInputsContainer');
+            container.innerHTML = '';
+            m.tables.forEach((t, idx) => {
+                const card = document.createElement('div');
+                card.className = 'score-table-card';
+                card.innerHTML = `
+                    <div class="score-table-header">Table: ${t.name}</div>
+                    <div class="score-row">
+                        <input type="text" value="${t.team1}" placeholder="Team 1" class="score-input-team" data-idx="${idx}" data-side="1">
+                        <input type="number" placeholder="0" min="0" class="score-val-1">
+                        <div class="score-vs">VS</div>
+                        <input type="number" placeholder="0" min="0" class="score-val-2">
+                        <input type="text" value="${t.team2}" placeholder="Team 2" class="score-input-team" data-idx="${idx}" data-side="2">
+                    </div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function broadcastTimer() { send('timer', 'update', { seconds: timerState.currentSeconds, running: timerState.running }); }
+
+        document.getElementById('timerStart').addEventListener('click', () => {
+            if (!timerState.running && timerState.currentSeconds > 0) {
+                // LOGIC: If "Up Next" is showing, switch to that match
+                if (isNextVisible && upNextDisplayIndex !== -1) {
+                    selectMatch(upNextDisplayIndex);
+                    isNextVisible = false;
+                    upNextDisplayIndex = -1;
+                    send('nextMatchInterstitial', 'hide');
+                }
+
+                timerState.running = true;
+                timerStatus.classList.add('active');
+                send('sound', 'play', { sound: 'start' });
+
+                // Show Current Match on Start
+                if (currentMatchIndex >= 0 && scheduleData[currentMatchIndex]) {
+                    const m = scheduleData[currentMatchIndex];
+                    send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+                }
+
+                timerState.interval = setInterval(() => {
+                    if (timerState.currentSeconds > 0) {
+                        timerState.currentSeconds--;
+                        updateTimerDisplay();
+                        broadcastTimer();
+                        if (timerState.currentSeconds === 30) send('sound', 'play', { sound: 'warning30' });
+                    }
+                    if (timerState.currentSeconds === 0) endMatchSequence();
+                }, 1000);
+                broadcastTimer();
+            }
+        });
+
+               function endMatchSequence() {
+            clearInterval(timerState.interval);
+            timerState.running = false;
+            timerStatus.classList.remove('active');
+            
+            send('sound', 'play', { sound: 'end' });
+            
+            // Auto Advance logic — 3s delay before showing Up Next
+            if (currentMatchIndex < scheduleData.length - 1) {
+                const nextIdx = currentMatchIndex + 1;
+                selectMatch(nextIdx);
+
+                upNextTimeout = setTimeout(() => {
+                    upNextTimeout = null;
+                    const m = scheduleData[nextIdx];
+                    send('currentMatch', 'hide');
+                    send('nextMatchInterstitial', 'show', { match: m.match, time: m.time, tables: m.tables });
+                    isNextVisible = true;
+                    upNextDisplayIndex = nextIdx;
+                }, 3000);
+            }
+
+            // NEW: Automatically reset timer for the next match
+            // This updates the control panel UI and prepares the timer
+            timerState.totalSeconds = (parseInt(document.getElementById('timerMinutes').value) || 0) * 60 + (parseInt(document.getElementById('timerSeconds').value) || 30);
+            timerState.currentSeconds = timerState.totalSeconds;
+            updateTimerDisplay();
+            
+            // Broadcast the reset state (0 seconds running=false is handled by timer update)
+            // Note: We do not broadcast 'timerVisibility: show' here, we wait for the user to start.
+        }
+
+        document.getElementById('timerStop').addEventListener('click', () => {
+            timerState.running = false; timerStatus.classList.remove('active'); clearInterval(timerState.interval); broadcastTimer();
+        });
+
+        document.getElementById('timerReset').addEventListener('click', () => {
+            timerState.running = false; timerStatus.classList.remove('active'); clearInterval(timerState.interval);
+            timerState.totalSeconds = (parseInt(document.getElementById('timerMinutes').value) || 0) * 60 + (parseInt(document.getElementById('timerSeconds').value) || 30);
+            timerState.currentSeconds = timerState.totalSeconds;
+            updateTimerDisplay(); broadcastTimer();
+            send('sound', 'play', { sound: 'reset' });
+        });
+
+        // --- SCHEDULE LOGIC ---
+        document.getElementById('toggleHelp').addEventListener('click', () => {
+            const h = document.getElementById('jsonHelp'); h.style.display = h.style.display === 'none' ? 'block' : 'none';
+        });
+
+        function loadJsonSchedule() {
+            try {
+                const data = JSON.parse(document.getElementById('scheduleJson').value);
+                if (!Array.isArray(data)) throw new Error("Must be array.");
+                scheduleData = []; let mc = 1;
+                data.forEach(slot => {
+                    if (!slot.Time) return;
+                    const time = slot.Time.trim(); const tables = [];
+                    Object.keys(slot).forEach(key => {
+                        if (key === "Time") return;
+                        if (key.endsWith(" A")) {
+                            const tName = key.substring(0, key.length - 2).trim();
+                            const tA = String(slot[key]).trim();
+                            const tB = slot[key.replace(" A", " B")] ? String(slot[key.replace(" A", " B")]).trim() : "";
+                            if (tA && tB) tables.push({ name: tName, team1: tA, team2: tB });
+                        }
+                    });
+                    if (tables.length > 0) scheduleData.push({ match: mc++, time: time, tables: tables });
+                });
+                currentMatchIndex = -1; renderSchedule();
+                updateScoreEntryDropdown();
+                if (scheduleData.length > 0) selectMatch(0);
+                saveState();
+                alert(`Loaded ${scheduleData.length} blocks.`);
+            } catch (e) { alert("Error: " + e.message); }
+        }
+
+        function renderSchedule() {
+            const list = document.getElementById('scheduleList'); list.innerHTML = '';
+            if (scheduleData.length === 0) { list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Empty.</div>'; return; }
+            scheduleData.forEach((m, i) => {
+                const item = document.createElement('div');
+                item.className = 'schedule-item' + (i === currentMatchIndex ? ' active' : '');
+                item.innerHTML = `<span class="schedule-time">Match ${m.match}</span><div style="flex:1;"><div style="font-weight: 600;">${m.time}</div><div class="schedule-sub">Tables: ${m.tables.map(t=>t.name).join(', ')}</div></div>`;
+                item.onclick = () => selectMatch(i);
+                list.appendChild(item);
+            });
+            updateMatchCounter();
+        }
+
+        function selectMatch(index) {
+            if (index < 0 || index >= scheduleData.length) return;
+            currentMatchIndex = index; saveState(); renderSchedule();
+            document.getElementById('currentMatchLabel').textContent = `Match ${scheduleData[index].match} (${scheduleData[index].time})`;
+            updateMatchControlTab();
+            loadScoreEntry(index);
+            updateMatchCounter();
+        }
+
+        function updateMatchCounter() {
+            const c = document.getElementById('matchCounter');
+            c.textContent = scheduleData.length > 0 ? `${currentMatchIndex + 1} / ${scheduleData.length}` : "0 / 0";
+        }
+
+        document.getElementById('loadSchedule').onclick = loadJsonSchedule;
+        document.getElementById('prevMatch').onclick = () => { if (currentMatchIndex > 0) selectMatch(currentMatchIndex - 1); };
+        document.getElementById('nextMatch').onclick = () => { if (currentMatchIndex < scheduleData.length - 1) selectMatch(currentMatchIndex + 1); };
+
+        // --- DISPLAY CONTROLS ---
+        document.getElementById('showCurrentMatch').onclick = () => {
+             if (currentMatchIndex >= 0 && scheduleData[currentMatchIndex]) {
+                const m = scheduleData[currentMatchIndex];
+                send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+            } else { alert("No match selected."); }
+        };
+        document.getElementById('hideCurrentMatch').onclick = () => send('currentMatch', 'hide');
+        
+        document.getElementById('showNextMatch').onclick = () => {
+            if (currentMatchIndex < scheduleData.length - 1) {
+                const nextIdx = currentMatchIndex + 1;
+                const m = scheduleData[nextIdx];
+                send('nextMatchInterstitial', 'show', { match: m.match, time: m.time, tables: m.tables });
+                isNextVisible = true;
+                upNextDisplayIndex = nextIdx;
+            } else { alert("No next match available."); }
+        };
+
+        document.getElementById('hideNextMatch').onclick = () => { 
+            send('nextMatchInterstitial', 'hide'); 
+            isNextVisible = false; 
+        };
+
+        // --- SCORE LOGIC ---
+        function showScoreNow() {
+            const idx = scoreEntryIndex >= 0 ? scoreEntryIndex : currentMatchIndex;
+            const m = scheduleData[idx];
+            if (!m) return;
+            const tableScores = [];
+            document.querySelectorAll('#scoreInputsContainer .score-table-card').forEach((card, i) => {
+                tableScores.push({
+                    name: m.tables[i].name,
+                    team1: card.querySelector(`[data-side="1"]`).value,
+                    team2: card.querySelector(`[data-side="2"]`).value,
+                    score1: card.querySelector(`.score-val-1`).value || '0',
+                    score2: card.querySelector(`.score-val-2`).value || '0'
+                });
+            });
+            send('score', 'show', { match: m.match, tables: tableScores });
+            document.getElementById('scoreStatus').classList.add('active');
+        }
+
+        function doScoreToggle() {
+            scoreVisible = !scoreVisible;
+            ['scoreToggle', 'mc-scoreToggle'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                if (scoreVisible) {
+                    btn.textContent = 'Hide Score';
+                    btn.className = 'btn btn-danger';
+                } else {
+                    btn.textContent = 'Show Score';
+                    btn.className = 'btn btn-primary';
+                }
+            });
+            if (scoreVisible) {
+                showScoreNow();
+            } else {
+                send('score', 'hide');
+                document.getElementById('scoreStatus').classList.remove('active');
+            }
+        }
+        document.getElementById('scoreToggle').onclick = doScoreToggle;
+
+        // --- QUEUE MATCH LOGIC ---
+        function doQueueMatch() {
+            // Cancel the auto Up Next timeout if it hasn't fired yet
+            if (upNextTimeout) { clearTimeout(upNextTimeout); upNextTimeout = null; }
+
+            // Reset timer
+            timerState.running = false;
+            timerStatus.classList.remove('active');
+            clearInterval(timerState.interval);
+            timerState.totalSeconds = (parseInt(document.getElementById('timerMinutes').value) || 0) * 60 + (parseInt(document.getElementById('timerSeconds').value) || 30);
+            timerState.currentSeconds = timerState.totalSeconds;
+            updateTimerDisplay();
+            broadcastTimer();
+
+            // Hide Up Next overlay
+            send('nextMatchInterstitial', 'hide');
+            isNextVisible = false;
+
+            // Show current match bar (already set to the upcoming match)
+            if (currentMatchIndex >= 0 && scheduleData[currentMatchIndex]) {
+                const m = scheduleData[currentMatchIndex];
+                send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+            }
+
+            // Bring timer into view showing reset time
+            send('timerVisibility', 'show', { visible: true });
+        }
+        document.getElementById('queueMatchBtn').onclick = doQueueMatch;
+
+        // --- MATCH CONTROL TAB WIRING ---
+        document.getElementById('mc-timerStart').onclick = () => document.getElementById('timerStart').click();
+        document.getElementById('mc-timerStop').onclick = () => document.getElementById('timerStop').click();
+        document.getElementById('mc-timerReset').onclick = () => document.getElementById('timerReset').click();
+        document.getElementById('mc-queueMatch').onclick = doQueueMatch;
+        document.getElementById('mc-scoreToggle').onclick = doScoreToggle;
+        document.getElementById('mc-showTimer').onclick = () => send('timerVisibility', 'show', { visible: true });
+        document.getElementById('mc-hideTimer').onclick = () => send('timerVisibility', 'hide', { visible: false });
+        document.getElementById('mc-showCurrent').onclick = () => document.getElementById('showCurrentMatch').click();
+        document.getElementById('mc-hideCurrent').onclick = () => document.getElementById('hideCurrentMatch').click();
+        document.getElementById('mc-showNext').onclick = () => document.getElementById('showNextMatch').click();
+        document.getElementById('mc-hideNext').onclick = () => document.getElementById('hideNextMatch').click();
+
+        // --- SCORE ENTRY TAB WIRING ---
+        document.getElementById('se-matchSelect').onchange = (e) => {
+            const idx = parseInt(e.target.value);
+            if (!isNaN(idx)) loadScoreEntry(idx);
+        };
+        document.getElementById('se-showScore').onclick = () => {
+            scoreVisible = true;
+            ['scoreToggle', 'mc-scoreToggle'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) { btn.textContent = 'Hide Score'; btn.className = 'btn btn-danger'; }
+            });
+            showScoreNow();
+        };
+        document.getElementById('se-hideScore').onclick = () => {
+            scoreVisible = false;
+            ['scoreToggle', 'mc-scoreToggle'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) { btn.textContent = 'Show Score'; btn.className = 'btn btn-primary'; }
+            });
+            send('score', 'hide');
+            document.getElementById('scoreStatus').classList.remove('active');
+        };
+
+        // --- COMMIT TO HISTORY ---
+        document.getElementById('commitMatchBtn').onclick = () => {
+            const idx = scoreEntryIndex >= 0 ? scoreEntryIndex : currentMatchIndex;
+            const m = scheduleData[idx];
+            if (!m) { alert('No match loaded in Score Entry.'); return; }
+            const tableScores = [];
+            document.querySelectorAll('#scoreInputsContainer .score-table-card').forEach((card, i) => {
+                tableScores.push({
+                    name: m.tables[i].name,
+                    team1: card.querySelector(`[data-side="1"]`).value,
+                    team2: card.querySelector(`[data-side="2"]`).value,
+                    score1: card.querySelector(`.score-val-1`).value || '0',
+                    score2: card.querySelector(`.score-val-2`).value || '0'
+                });
+            });
+            socket.emit('commit-match', { match: m.match, tables: tableScores });
+            alert(`Match ${m.match} saved to history!`);
+        };
+
+        // --- REFEREE SYNC LOGIC ---
+        socket.on('ref-score-update', (scores) => {
+            const rs = document.getElementById('se-refSync');
+            if (rs) { rs.textContent = "Updated by Ref!"; setTimeout(() => rs.textContent = "", 3000); }
+            
+            scores.tables.forEach(t => {
+                const card = document.querySelectorAll('.score-table-card')[t.tableIdx];
+                if(card) {
+                    card.querySelector('.score-val-1').value = t.score1;
+                    card.querySelector('.score-val-2').value = t.score2;
+                }
+            });
+        });
+
+        // --- HISTORY TAB LOGIC ---
+        socket.on('history-update', (history) => {
+            const container = document.getElementById('historyLog');
+            if(history.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary);">No matches completed.</div>';
+                return;
+            }
+            container.innerHTML = history.map(m => `
+                <div class="score-table-card" style="margin-bottom:10px;">
+                    <div class="score-table-header">Match ${m.match}</div>
+                    ${m.tables.map(t => `
+                        <div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:5px;">
+                            <span>${t.team1}: <b>${t.score1}</b></span>
+                            <span>${t.team2}: <b>${t.score2}</b></span>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        });
+
+        document.getElementById('showTicker').onclick = () => send('ticker', 'show');
+        document.getElementById('hideTicker').onclick = () => send('ticker', 'hide');
+        document.getElementById('clearHistory').onclick = () => { if(confirm("Clear all history?")) socket.emit('clear-history'); };
+
+        // --- OTHER CONTROLS ---
+        const simpleBtn = (id, type, action, getData) => document.getElementById(id).onclick = () => send(type, action, getData ? getData() : undefined);
+        
+        simpleBtn('ltShow', 'lowerThird', 'show', () => ({ line1: document.getElementById('ltLine1').value, line2: document.getElementById('ltLine2').value, style: document.getElementById('ltStyle').value }));
+        simpleBtn('ltHide', 'lowerThird', 'hide');
+        simpleBtn('teamShow', 'teamIntro', 'show', () => ({ name: document.getElementById('teamName').value, number: document.getElementById('teamNumber').value, org: document.getElementById('teamOrg').value, members: document.getElementById('teamMembers').value.split('\n'), coach: document.getElementById('teamCoach').value, color1: document.getElementById('teamColor1').value, color2: document.getElementById('teamColor2').value }));
+        simpleBtn('teamHide', 'teamIntro', 'hide');
+        simpleBtn('awardShow', 'award', 'show', () => ({ award: document.getElementById('awardName').value === 'Custom' ? document.getElementById('awardCustom').value : document.getElementById('awardName').value, position: document.getElementById('awardPosition').value, team: document.getElementById('awardTeam').value, teamNum: document.getElementById('awardTeamNum').value }));
+        simpleBtn('awardHide', 'award', 'hide');
+        simpleBtn('showIntro', 'transition', 'intro', () => ({ event: document.getElementById('eventName').value }));
+        simpleBtn('showOutro', 'transition', 'outro', () => ({ event: document.getElementById('eventName').value }));
+        simpleBtn('showBumper', 'transition', 'bumper', () => ({ text: document.getElementById('bumperText').value }));
+        simpleBtn('hideTransition', 'transition', 'hide');
+        simpleBtn('showEvent', 'eventTitle', 'show', () => ({ name: document.getElementById('eventName').value }));
+        simpleBtn('hideEvent', 'eventTitle', 'hide');
+        simpleBtn('showTimer', 'timerVisibility', 'show', () => ({ visible: true }));
+        simpleBtn('hideTimer', 'timerVisibility', 'hide', () => ({ visible: false }));
+        document.getElementById('clearAll').onclick = () => { send('clearAll'); document.querySelectorAll('.status-indicator').forEach(s => s.classList.remove('active')); };
+
+        // Background
+        document.querySelectorAll('.chroma-preset').forEach(p => {
+            p.onclick = () => {
+                const c = p.dataset.color;
+                send('setBackground', 'update', { color: c });
+                document.querySelectorAll('.chroma-preset').forEach(x => x.classList.remove('active'));
+                p.classList.add('active');
+            };
+        });
+        document.getElementById('applyCustomBg').onclick = () => {
+            const c = document.getElementById('customBgHex').value;
+            if(/^#[0-9A-Fa-f]{6}$/.test(c)) {
+                send('setBackground', 'update', { color: c });
+                document.querySelectorAll('.chroma-preset').forEach(x => x.classList.remove('active'));
+            }
+        };
+        document.getElementById('customBgColor').oninput = (e) => document.getElementById('customBgHex').value = e.target.value;
+
+        // Sounds
+        const soundKeyMap = { Start: 'start', '30s': 'warning30', End: 'end', Reset: 'reset' };
+        ['Start', '30s', 'End', 'Reset'].forEach(s => {
+            const input = document.getElementById('sound' + s);
+            const name = document.getElementById('sound' + s + 'Name');
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if(file){
+                    const r = new FileReader();
+                    r.onload = (ev) => {
+                        send('sound', 'load', { sound: soundKeyMap[s], data: ev.target.result });
+                        name.textContent = file.name; name.classList.add('loaded');
+                    };
+                    r.readAsDataURL(file);
+                }
+            };
+        });
+
+        updateTimerDisplay();
+    </script>
+</body>
+</html>

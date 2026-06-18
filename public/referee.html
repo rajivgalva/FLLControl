@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referee Input</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #1a2235; --card: #111827; --accent: #ff6b00; --text: #e8edf5; --border: #2a3654; }
+        body { font-family: 'Rajdhani', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+        h1 { font-size: 1.2rem; text-align: center; margin-bottom: 15px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+        .match-info { text-align: center; margin-bottom: 20px; font-size: 1.5rem; font-weight: 700; }
+        .table-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .table-name { color: var(--accent); font-weight: 700; margin-bottom: 10px; display: block; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+        .team-row { display: flex; align-items: center; margin-bottom: 10px; }
+        .team-name { flex: 1; font-size: 1.1rem; }
+        .score-input { width: 70px; padding: 8px; font-size: 1.2rem; text-align: center; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; margin-left: 10px; }
+        .vs { text-align: center; font-size: 0.8rem; color: #888; margin: 5px 0; }
+        .btn-submit { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: 700; cursor: pointer; text-transform: uppercase; }
+        .status { text-align: center; margin-top: 10px; color: #00c853; display: none; }
+    </style>
+</head>
+<body>
+    <h1>Referee Scoring</h1>
+    <div class="match-info" id="matchInfo">Waiting for Match...</div>
+    
+    <div id="tablesContainer"></div>
+    
+    <button class="btn-submit" onclick="submitScores()">Submit Scores</button>
+    <div class="status" id="statusMsg">Scores Sent!</div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentMatchData = null;
+
+        socket.on('connect', () => {
+            // Ask for current match data immediately
+            socket.emit('get-ref-data');
+        });
+
+        socket.on('ref-data-update', (data) => {
+            currentMatchData = data;
+            renderUI();
+        });
+
+        // Listen for updates from Control Panel
+        socket.on('graphics-update', (msg) => {
+            if(msg.type === 'currentMatch' && msg.action === 'show') {
+                currentMatchData = msg.data;
+                renderUI();
+            }
+        });
+
+        function renderUI() {
+            if(!currentMatchData) return;
+            document.getElementById('matchInfo').textContent = `Match ${currentMatchData.match} - ${currentMatchData.time}`;
+            
+            const container = document.getElementById('tablesContainer');
+            container.innerHTML = '';
+            
+            currentMatchData.tables.forEach((t, idx) => {
+                const card = document.createElement('div');
+                card.className = 'table-card';
+                card.innerHTML = `
+                    <span class="table-name">Table: ${t.name}</span>
+                    <div class="team-row">
+                        <span class="team-name">${t.team1}</span>
+                        <input type="number" class="score-input" id="s1-${idx}" placeholder="0">
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="team-row">
+                        <span class="team-name">${t.team2}</span>
+                        <input type="number" class="score-input" id="s2-${idx}" placeholder="0">
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function submitScores() {
+            if(!currentMatchData) return;
+            
+            const scores = [];
+            currentMatchData.tables.forEach((t, idx) => {
+                scores.push({
+                    tableIdx: idx,
+                    tableName: t.name,
+                    team1: t.team1,
+                    team2: t.team2,
+                    score1: document.getElementById(`s1-${idx}`).value || 0,
+                    score2: document.getElementById(`s2-${idx}`).value || 0
+                });
+            });
+
+            socket.emit('ref-submit-scores', { match: currentMatchData.match, tables: scores });
+            
+            // Visual feedback
+            const btn = document.querySelector('.btn-submit');
+            const status = document.getElementById('statusMsg');
+            btn.disabled = true;
+            btn.innerText = "Sent!";
+            status.style.display = 'block';
+            
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = "Submit Scores";
+                status.style.display = 'none';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

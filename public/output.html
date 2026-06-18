@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLL Graphics Output</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17; --bg-secondary: #111827; --text-primary: #e8edf5;
+            --text-secondary: #8b9dc3; --accent: #CC1F2D; --cyan: #00A9E0;
+            --success: #00c853; --danger: #ff3d00; --orange: #F7941D;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* Base Container for Scaling */
+        body { background-color: #000; overflow: hidden; width: 100vw; height: 100vh; }
+        #scaled-root {
+            position: absolute;
+            top: 0; left: 0;
+            width: 1920px; 
+            height: 1080px;
+            transform-origin: top left;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            transition: background-color 0.5s ease;
+        }
+
+        /* Layers */
+        .bg-layer { position: absolute; inset: 0; background: linear-gradient(135deg, #0a0e17 0%, #1a2235 100%); z-index: 0; transition: opacity 0.5s ease; }
+        .bg-layer::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 30%, rgba(255, 107, 0, 0.1) 0%, transparent 50%), radial-gradient(ellipse at 70% 70%, rgba(0, 229, 255, 0.1) 0%, transparent 50%); opacity: 0.5; }
+        .grid-pattern { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 50px 50px; z-index: 1; transition: opacity 0.5s ease; }
+        body.chroma-mode #scaled-root .bg-layer, body.chroma-mode #scaled-root .grid-pattern { opacity: 0; pointer-events: none; }
+
+        /* Timer */
+        .timer-container { position: absolute; top: 30px; right: 30px; z-index: 100; opacity: 0; transform: translateX(100px); transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .timer-container.visible { opacity: 1; transform: translateX(0); }
+        .timer-box { background: rgba(26, 34, 53, 0.95); border: 2px solid rgba(255, 107, 0, 0.3); border-radius: 16px; padding: 20px 40px; display: flex; align-items: center; gap: 20px; }
+        .timer-label { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
+        .timer-value { font-family: 'Inter', sans-serif; font-size: 4rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; min-width: 250px; text-align: center; }        .timer-container.warning .timer-value { color: var(--accent); }
+        .timer-container.danger .timer-value { color: var(--danger); animation: timerPulse 0.5s infinite; }
+        .timer-container.running .timer-box { border-color: var(--success); }
+        @keyframes timerPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        /* Current Match Bar (Bottom) */
+        .current-match-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 90; opacity: 0; transform: translateY(100%); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); display: flex; justify-content: center; padding-bottom: 30px; pointer-events: none; }
+        .current-match-bar.visible { opacity: 1; transform: translateY(0); }
+        .current-match-content { background: rgba(17, 24, 39, 0.95); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 15px 30px; display: flex; flex-direction: column; align-items: center; min-width: 600px; }
+        .current-match-header { display: flex; align-items: center; gap: 20px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; width: 100%; justify-content: center; }
+        .current-match-title { font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.08em; }
+        .current-match-time { font-family: 'Inter', sans-serif; font-size: 1.2rem; color: var(--accent); }
+        
+        .match-list { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+        .match-row { display: flex; align-items: center; background: rgba(255,255,255,0.05); border-radius: 6px; padding: 8px 15px; border: 1px solid rgba(255,255,255,0.05); }
+        .match-table-name { font-family: 'Inter', sans-serif; font-size: 0.8rem; color: var(--cyan); margin-right: 15px; }
+        .match-teams { font-size: 1.1rem; font-weight: 600; }
+        .match-separator { margin: 0 8px; color: var(--text-secondary); font-size: 0.9rem; }
+
+        /* Next Match Interstitial (Center) */
+        /* Next Match Interstitial — transparent so chroma key shows through */
+        .next-match-overlay { position: absolute; inset: 0; z-index: 500; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.5s ease; }
+        .next-match-overlay.visible { opacity: 1; visibility: visible; }
+        .next-match-content { background: rgba(10, 14, 23, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 50px 60px; text-align: center; transform: scale(0.95); transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); min-width: 800px; }
+        .next-match-overlay.visible .next-match-content { transform: scale(1); }
+        .next-match-label { font-size: 0.85rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 12px; }
+        .next-match-num { font-size: 6rem; font-weight: 900; line-height: 1; color: var(--text-primary); letter-spacing: -0.03em; margin-bottom: 4px; }
+        .next-match-time { font-size: 1.5rem; font-weight: 600; color: var(--cyan); letter-spacing: -0.01em; margin-bottom: 36px; padding-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+        .next-match-tables { display: flex; flex-direction: column; gap: 10px; }
+        .next-match-table-row { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid var(--cyan); border-radius: 8px; padding: 12px 20px; }
+        .next-match-table-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--cyan); margin-bottom: 6px; }
+        .next-match-matchup { display: grid; grid-template-columns: 1fr 60px 1fr; align-items: center; gap: 10px; }
+        .next-match-team { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
+        .next-match-team:first-child { text-align: right; }
+        .next-match-team:last-child { text-align: left; }
+        .next-match-vs { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-align: center; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Score Display */
+        .score-display { position: absolute; top: 30px; left: 30px; z-index: 100; opacity: 0; transform: translateX(-100px); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); max-width: 500px; max-height: 80vh; overflow-y: auto; }
+        .score-display.visible { opacity: 1; transform: translateX(0); }
+        .score-box { background: rgba(26, 34, 53, 0.95); border: 2px solid rgba(0, 229, 255, 0.3); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .score-header { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 10px; }
+        .score-match { font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--cyan); letter-spacing: 0.08em; text-transform: uppercase; }
+        
+        .score-table-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
+        .score-table-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .score-table-label { font-family: 'Inter', sans-serif; font-size: 0.8rem; color: var(--cyan); margin-bottom: 5px; display: block; }
+        .score-team-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .score-team-name { font-size: 1.2rem; font-weight: 600; }
+        .score-value { font-family: 'Inter', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--accent); min-width: 60px; text-align: right; }
+        .score-vs { text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin: 2px 0; }
+
+        /* Lower Third */
+        .lower-third { position: absolute; bottom: 80px; left: 0; z-index: 100; opacity: 0; transform: translateX(-100%); transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+        .lower-third.visible { opacity: 1; transform: translateX(0); }
+        .lt-content { display: flex; flex-direction: column; }
+        .lt-line1 { font-family: 'Inter', sans-serif; font-size: 3.5rem; font-weight: 800; line-height: 1; padding: 15px 60px 10px 40px; background: linear-gradient(90deg, var(--accent) 0%, rgba(255, 107, 0, 0.8) 100%); clip-path: polygon(0 0, 100% 0, calc(100% - 30px) 100%, 0 100%); text-transform: uppercase; letter-spacing: -0.01em; }
+        .lt-line2 { font-family: 'Inter', sans-serif; font-size: 1.8rem; font-weight: 500; padding: 12px 60px 12px 50px; background: rgba(17, 24, 39, 0.95); clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 100%, 0 100%); color: var(--text-secondary); letter-spacing: 0; margin-left: 20px; }
+        .lower-third.highlight .lt-line1 { background: linear-gradient(90deg, var(--cyan) 0%, rgba(0, 229, 255, 0.8) 100%); }
+        .lower-third.alert .lt-line1 { background: linear-gradient(90deg, var(--danger) 0%, rgba(255, 61, 0, 0.8) 100%); }
+
+        /* Team Intro */
+        .team-intro { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; visibility: hidden; transition: all 0.5s ease; }
+        .team-intro.visible { opacity: 1; visibility: visible; }
+        .team-intro-bg { position: absolute; inset: 0; background: rgba(10, 14, 23, 0.97); }
+        .team-intro-content { position: relative; display: flex; gap: 60px; align-items: center; transform: scale(0.9); transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+        .team-intro.visible .team-intro-content { transform: scale(1); }
+        .team-logo-area { width: 300px; height: 300px; border-radius: 20px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .team-logo-area::before { content: ''; position: absolute; inset: 4px; background: rgba(10, 14, 23, 0.8); border-radius: 16px; }
+        .team-number { position: relative; font-family: 'Inter', sans-serif; font-size: 5rem; font-weight: 900; letter-spacing: -0.03em; color: var(--text-primary); }
+        .team-info { max-width: 500px; }
+        .team-name { font-family: 'Inter', sans-serif; font-size: 5rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; }
+        .team-org { font-size: 1.5rem; color: var(--accent); margin-bottom: 30px; }
+        .team-members { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 25px; }
+        .team-member { background: rgba(255, 255, 255, 0.1); padding: 8px 20px; border-radius: 20px; font-size: 1.1rem; }
+        .team-coach { font-size: 1.1rem; color: var(--text-secondary); }
+        .team-coach span { color: var(--text-primary); font-weight: 600; }
+
+        /* Award */
+        .award-display { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; visibility: hidden; transition: all 0.5s ease; }
+        .award-display.visible { opacity: 1; visibility: visible; }
+        .award-bg { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(255, 107, 0, 0.15) 0%, rgba(10, 14, 23, 0.97) 70%); }
+        .award-content { position: relative; text-align: center; transform: translateY(30px); transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+        .award-display.visible .award-content { transform: translateY(0); }
+        .award-position { font-family: 'Inter', sans-serif; font-size: 1.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 20px; }
+        .award-name { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 900; line-height: 1; text-transform: uppercase; letter-spacing: -0.02em; background: linear-gradient(135deg, var(--accent) 0%, #ffd700 50%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 40px; }
+        .award-team { font-size: 3rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text-primary); margin-bottom: 10px; }
+        .award-team-num { font-family: 'Inter', sans-serif; font-size: 2rem; font-weight: 600; color: var(--cyan); letter-spacing: 0.08em; }
+
+        /* Transitions (Intro, Outro, Bumper) */
+        .transition-overlay { position: absolute; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.5s ease; }
+        .transition-overlay.visible { opacity: 1; visibility: visible; }
+        .transition-bg { position: absolute; inset: 0; background: var(--bg-primary); }
+        .transition-content { position: relative; text-align: center; }
+        .transition-event { font-family: 'Inter', sans-serif; font-size: 5rem; font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .transition-subtitle { font-family: 'Inter', sans-serif; font-size: 1.1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-secondary); margin-top: 20px; }
+
+        /* Intro Overlay */
+        .intro-overlay { position: absolute; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; }
+        .intro-overlay.visible { opacity: 1; visibility: visible; }
+        .intro-bg { position: absolute; inset: 0; background: var(--bg-primary); overflow: hidden; }
+        .intro-particle { position: absolute; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; animation: float 3s infinite ease-in-out; }
+        @keyframes float { 0%, 100% { transform: translateY(0) scale(1); opacity: 0.5; } 50% { transform: translateY(-30px) scale(1.5); opacity: 1; } }
+        .intro-content { position: relative; text-align: center; }
+        .intro-logo { font-family: 'Inter', sans-serif; font-size: 4rem; font-weight: 900; color: var(--text-primary); letter-spacing: 0.15em; margin-bottom: 30px; }
+        .intro-event { font-family: 'Inter', sans-serif; font-size: 3rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+
+        /* Bumper Overlay */
+        .bumper-overlay { position: absolute; inset: 0; z-index: 350; display: flex; align-items: center; justify-content: center; background: rgba(10, 14, 23, 0.95); opacity: 0; visibility: hidden; transition: all 0.5s ease; }
+        .bumper-overlay.visible { opacity: 1; visibility: visible; }
+        .bumper-text { font-family: 'Inter', sans-serif; font-size: 4rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-primary); }
+
+        /* Event Title */
+        .event-title { position: absolute; bottom: 30px; right: 30px; z-index: 90; opacity: 0; transform: translateY(50px); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .event-title.visible { opacity: 1; transform: translateY(0); }
+        .event-title-box { background: rgba(10, 14, 23, 0.9); border: 1px solid rgba(255, 107, 0, 0.3); border-radius: 12px; padding: 15px 30px; }
+        .event-title-text { font-family: 'Inter', sans-serif; font-size: 1.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+
+        /* Ticker Styles */
+.ticker-wrap {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 50px;
+    background: rgba(10, 14, 23, 0.95);
+    border-top: 2px solid var(--accent);
+    z-index: 150;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(100%);
+    transition: all 0.5s ease;
+}
+.ticker-wrap.visible { opacity: 1; transform: translateY(0); }
+.ticker {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    animation: scroll 30s linear infinite;
+    padding-left: 100%;
+    white-space: nowrap;
+}
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 30px;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    height: 100%;
+}
+.ticker-match { font-family: 'Inter', sans-serif; color: var(--cyan); margin-right: 10px; font-size: 0.9rem; }
+.ticker-result { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.ticker-score { color: var(--accent); margin: 0 5px; }
+
+@keyframes scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+        /* Logo Watermark */
+        .logo-watermark { position: absolute; top: 30px; left: 30px; z-index: 80; opacity: 0.9; pointer-events: none; }
+        .logo-watermark img { height: 120px; width: auto; display: block; }
+
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
+    </style>
+</head>
+<body>
+    <!-- Wrapper for Scaling -->
+    <div id="scaled-root">
+        <div class="bg-layer"></div>
+        <div class="grid-pattern"></div>
+
+        <div class="timer-container" id="timerContainer">
+            <div class="timer-box"><div><div class="timer-label">Match Time</div><div class="timer-value" id="timerValue">02:30</div></div></div>
+        </div>
+
+        <div class="current-match-bar" id="currentMatchBar">
+            <div class="current-match-content">
+                <div class="current-match-header">
+                    <span class="current-match-title">Match <span id="currentMatchNum">1</span></span>
+                    <span class="current-match-time" id="currentTime">09:00 AM</span>
+                </div>
+                <div class="match-list" id="currentMatchList"></div>
+            </div>
+        </div>
+
+        <div class="next-match-overlay" id="nextMatchOverlay">
+            <div class="next-match-content">
+                <div class="next-match-label">Up Next</div>
+                <div class="next-match-num" id="nextMatchNum">Match 2</div>
+                <div class="next-match-time" id="nextMatchTime">09:30 AM</div>
+                <div class="next-match-tables" id="nextMatchTables"></div>
+            </div>
+        </div>
+
+        <div class="score-display" id="scoreDisplay">
+            <div class="score-box">
+                <div class="score-header"><div class="score-match" id="scoreMatch">Match 1</div></div>
+                <div id="scoreTablesContainer"></div>
+            </div>
+        </div>
+
+        <div class="lower-third" id="lowerThird"><div class="lt-content"><div class="lt-line1" id="ltLine1"></div><div class="lt-line2" id="ltLine2"></div></div></div>
+        
+        <div class="team-intro" id="teamIntro">
+            <div class="team-intro-bg"></div>
+            <div class="team-intro-content">
+                <div class="team-logo-area" id="teamLogoArea"><div class="team-number" id="teamNumber"></div></div>
+                <div class="team-info">
+                    <div class="team-name" id="teamName"></div>
+                    <div class="team-org" id="teamOrg"></div>
+                    <div class="team-members-title">Team Members</div>
+                    <div class="team-members" id="teamMembers"></div>
+                    <div class="team-coach">Coach: <span id="teamCoach"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="award-display" id="awardDisplay">
+            <div class="award-bg"></div>
+            <div class="award-content">
+                <div class="award-position" id="awardPosition"></div>
+                <div class="award-name" id="awardName"></div>
+                <div class="award-team" id="awardTeam"></div>
+                <div class="award-team-num" id="awardTeamNum"></div>
+            </div>
+        </div>
+
+        <div class="transition-overlay" id="transitionOverlay">
+            <div class="transition-bg"></div>
+            <div class="transition-content">
+                <div class="transition-event" id="transitionEvent"></div>
+                <div class="transition-subtitle" id="transitionSubtitle"></div>
+            </div>
+        </div>
+
+        <div class="intro-overlay" id="introOverlay">
+            <div class="intro-bg" id="introBg"></div>
+            <div class="intro-content">
+                <div class="intro-logo">FLL</div>
+                <div class="intro-event" id="introEvent"></div>
+            </div>
+        </div>
+
+        <div class="bumper-overlay" id="bumperOverlay"><div class="bumper-text" id="bumperText"></div></div>
+
+        <div class="event-title" id="eventTitle"><div class="event-title-box"><div class="event-title-text" id="eventTitleText"></div></div></div>
+
+        <!-- Persistent logo watermark -->
+        <div class="logo-watermark">
+            <img src="/Canada%20Cup%20Full%20Colour%20Reverse%20(2).png" alt="Canada Cup of Robotics">
+        </div>
+
+        <div class="ticker-wrap" id="tickerWrap">
+            <div class="ticker" id="tickerContent"></div>
+        </div>
+    </div>
+
+    <!-- SOCKET.IO SCRIPT -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let timerVisible = false;
+        let previousSeconds = -1; let wasRunning = false; let hasPlayed30sWarning = false;
+        let localSeconds = 0; let localRunning = false; let localCountdown = null;
+        const audioElements = { start: new Audio('/start.mp3'), warning30: new Audio('/warning30.mp3'), end: new Audio('/end.mp3'), reset: new Audio() };
+
+        // --- RECOVERY LOGIC ---
+        socket.on('state-recover', (state) => {
+            console.log("Recovering state...");
+            if(state.bg) handleBG({color: state.bg});
+            if(state.timer) handleTimer(state.timer);
+            if(state.currentMatch) handleCurrent('show', state.currentMatch);
+            if(state.nextMatch) handleNext('show', state.nextMatch);
+            if(state.score) handleScore('show', state.score);
+            if(state.lowerThird) handleLT('show', state.lowerThird);
+            if(state.teamIntro) handleTeam('show', state.teamIntro);
+            if(state.award) handleAward('show', state.award);
+        });
+        // --- SCALING LOGIC ---
+        function adjustScale() {
+            const root = document.getElementById('scaled-root');
+            const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const scaledW = 1920 * scale;
+            const scaledH = 1080 * scale;
+            const offsetX = (window.innerWidth - scaledW) / 2;
+            const offsetY = (window.innerHeight - scaledH) / 2;
+            root.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+            document.body.style.width = window.innerWidth + 'px';
+            document.body.style.height = window.innerHeight + 'px';
+        }
+        window.addEventListener('resize', adjustScale);
+        window.addEventListener('load', adjustScale);
+        // ---------------------
+
+        const isPreview = window.self !== window.top;
+        function playSound(k) { if(isPreview) return; const a = audioElements[k]; if(a.src) { a.currentTime=0; a.play().catch(e=>{}); } }
+        function formatTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+
+        // Main Message Handler
+        socket.on('graphics-update', (msg) => {
+            const { type, action, data } = msg;
+            switch(type) {
+                case 'timer': handleTimer(data); break;
+                case 'timerVisibility': handleVis(data); break;
+                case 'currentMatch': handleCurrent(action, data); break;
+                case 'nextMatchInterstitial': handleNext(action, data); break;
+                case 'score': handleScore(action, data); break;
+                case 'lowerThird': handleLT(action, data); break;
+                case 'teamIntro': handleTeam(action, data); break;
+                case 'award': handleAward(action, data); break;
+                case 'transition': handleTrans(action, data); break;
+                case 'eventTitle': handleET(action, data); break;
+                case 'setBackground': handleBG(data); break;
+                case 'clearAll': handleClear(); break;
+                case 'sound': 
+                    if(action==='load' && data && data.sound && data.data) audioElements[data.sound].src=data.data; 
+                    else if(action==='play' && data && data.sound) playSound(data.sound); 
+                    break;
+                case 'ticker': handleTicker(action, data); break;
+            }
+        });
+
+                   function handleTimer(d) {
+            const c = document.getElementById('timerContainer'), v = document.getElementById('timerValue');
+            
+            // Reset tracking on first update
+            if(previousSeconds===-1) previousSeconds=d.seconds;
+            
+            // Visibility Logic
+            if(!timerVisible && d.running) { 
+                timerVisible=true; 
+                c.classList.add('visible'); 
+            }
+
+            // Show server value immediately (authoritative resync)
+            v.textContent=formatTime(d.seconds);
+            localSeconds = d.seconds;
+            localRunning = d.running;
+
+            // Restart local countdown so display stays smooth between server updates.
+            // Each server update resets this interval; if a packet is delayed the
+            // local tick fills the gap instead of the display freezing.
+            if (localCountdown) { clearInterval(localCountdown); localCountdown = null; }
+            if (d.running && d.seconds > 0) {
+                localCountdown = setInterval(() => {
+                    if (localRunning && localSeconds > 0) {
+                        localSeconds--;
+                        document.getElementById('timerValue').textContent = formatTime(localSeconds);
+                    } else {
+                        clearInterval(localCountdown);
+                        localCountdown = null;
+                    }
+                }, 1000);
+            }
+
+            // Sound Logic
+            if(d.running && !wasRunning) { 
+                playSound('start'); 
+                hasPlayed30sWarning=false; 
+                // Hide "Up Next" overlay when match actually starts
+                document.getElementById('nextMatchOverlay').classList.remove('visible'); 
+            }
+            if(d.running && d.seconds<=30 && previousSeconds>30 && !hasPlayed30sWarning) { 
+                playSound('warning30'); 
+                hasPlayed30sWarning=true; 
+            }
+
+            // Logic for when timer hits 0
+            if(d.seconds === 0 && previousSeconds > 0) {
+                playSound('end');
+                // Hide timer visual after a short delay
+                setTimeout(() => {
+                    c.classList.remove('visible');
+                    timerVisible = false;
+                }, 1000);
+            }
+
+            previousSeconds=d.seconds; 
+            wasRunning=d.running;
+            
+            // UI State Classes
+            c.classList.remove('running', 'warning', 'danger');
+            if(d.running) { 
+                c.classList.add('running'); 
+                if(d.seconds<=30) c.classList.add('danger'); 
+                else if(d.seconds<=60) c.classList.add('warning'); 
+            }
+        }
+        
+        function handleVis(d) { const c=document.getElementById('timerContainer'); if(d.visible) { timerVisible=true; c.classList.add('visible'); } else { timerVisible=false; c.classList.remove('visible'); } }
+
+        function genList(id, tables) {
+            const l=document.getElementById(id); l.innerHTML='';
+            tables.forEach(t => {
+                const r=document.createElement('div'); r.className='match-row';
+                r.innerHTML=`<span class="match-table-name">${t.name}</span><span class="match-teams">${t.team1} <span class="match-separator">vs</span> ${t.team2}</span>`;
+                l.appendChild(r);
+            });
+        }
+
+        function handleCurrent(a, d) {
+            const el=document.getElementById('currentMatchBar');
+            if(a==='show' && d) {
+                document.getElementById('currentMatchNum').textContent=d.match;
+                document.getElementById('currentTime').textContent=d.time;
+                genList('currentMatchList', d.tables);
+                el.classList.add('visible');
+            } else el.classList.remove('visible');
+        }
+
+        function handleNext(a, d) {
+            const el=document.getElementById('nextMatchOverlay');
+            if(a==='show' && d) {
+                document.getElementById('nextMatchNum').textContent=`Match ${d.match}`;
+                document.getElementById('nextMatchTime').textContent=d.time;
+                const l=document.getElementById('nextMatchTables'); l.innerHTML='';
+                d.tables.forEach(t => {
+                    const r=document.createElement('div'); r.className='next-match-table-row';
+                    r.innerHTML=`
+                        <div class="next-match-table-label">Table: ${t.name}</div>
+                        <div class="next-match-matchup">
+                            <div class="next-match-team">${t.team1}</div>
+                            <div class="next-match-vs">vs</div>
+                            <div class="next-match-team">${t.team2}</div>
+                        </div>`;
+                    l.appendChild(r);
+                });
+                el.classList.add('visible');
+            } else el.classList.remove('visible');
+        }
+
+        function handleScore(a, d) {
+            const el=document.getElementById('scoreDisplay');
+            if(a==='show' && d) {
+                document.getElementById('scoreMatch').textContent=`Match ${d.match}`;
+                const c=document.getElementById('scoreTablesContainer'); c.innerHTML='';
+                d.tables.forEach(t => {
+                    const item = document.createElement('div'); item.className='score-table-item';
+                    item.innerHTML = `
+                        <span class="score-table-label">Table: ${t.name}</span>
+                        <div class="score-team-row"><div class="score-team-name">${t.team1}</div><div class="score-value">${t.score1||0}</div></div>
+                        <div class="score-vs">VS</div>
+                        <div class="score-team-row"><div class="score-team-name">${t.team2}</div><div class="score-value">${t.score2||0}</div></div>
+                    `;
+                    c.appendChild(item);
+                });
+                el.classList.add('visible');
+            } else el.classList.remove('visible');
+        }
+
+        function handleLT(a,d){
+            const e=document.getElementById('lowerThird');
+            if(a==='show'){
+                document.getElementById('ltLine1').textContent=d.line1||'';
+                document.getElementById('ltLine2').textContent=d.line2||'';
+                e.classList.remove('highlight','alert');
+                if(d.style==='highlight')e.classList.add('highlight');
+                else if(d.style==='alert')e.classList.add('alert');
+                e.classList.add('visible');
+            } else e.classList.remove('visible');
+        }
+
+        function handleTeam(a,d){
+            const e=document.getElementById('teamIntro');
+            if(a==='show'){
+                document.getElementById('teamName').textContent=d.name||'';
+                document.getElementById('teamNumber').textContent=d.number||'';
+                document.getElementById('teamOrg').textContent=d.org||'';
+                document.getElementById('teamCoach').textContent=d.coach||'';
+                document.getElementById('teamLogoArea').style.background=`linear-gradient(135deg, ${d.color1||'#ff6b00'}, ${d.color2||'#00e5ff'})`;
+                document.getElementById('teamOrg').style.color=d.color1||'#ff6b00';
+                const m=document.getElementById('teamMembers'); m.innerHTML='';
+                if(d.members)d.members.forEach(x=>{const el=document.createElement('div');el.className='team-member';el.textContent=x;m.appendChild(el);});
+                e.classList.add('visible');
+            } else e.classList.remove('visible');
+        }
+
+        function handleAward(a,d){
+            const e=document.getElementById('awardDisplay');
+            if(a==='show'){
+                let p=d.position;
+                if(p==='1st')p='1st Place'; else if(p==='2nd')p='2nd Place'; else if(p==='3rd')p='3rd Place'; else if(p==='winner')p='Winner';
+                document.getElementById('awardPosition').textContent=p;
+                document.getElementById('awardName').textContent=d.award||'';
+                document.getElementById('awardTeam').textContent=d.team||'';
+                document.getElementById('awardTeamNum').textContent=d.teamNum?`Team ${d.teamNum}`:'';
+                e.classList.add('visible');
+            } else e.classList.remove('visible');
+        }
+
+        function handleTrans(a,d){
+            document.getElementById('introOverlay').classList.remove('visible');
+            document.getElementById('bumperOverlay').classList.remove('visible');
+            document.getElementById('transitionOverlay').classList.remove('visible');
+            if(a==='intro'){
+                const o=document.getElementById('introOverlay');
+                document.getElementById('introEvent').textContent=d.event||'';
+                const bg=document.getElementById('introBg');
+                bg.innerHTML='';
+                for(let i=0;i<50;i++){
+                    const p=document.createElement('div');
+                    p.className='intro-particle';
+                    p.style.left=Math.random()*100+'%';
+                    p.style.top=Math.random()*100+'%';
+                    p.style.animationDelay=Math.random()*3+'s';
+                    p.style.background=Math.random()>0.5?'#ff6b00':'#00e5ff';
+                    bg.appendChild(p);
+                }
+                o.classList.add('visible');
+                setTimeout(()=>o.classList.remove('visible'), 5000);
+            }
+            else if(a==='outro'){
+                document.getElementById('transitionEvent').textContent=d.event||'';
+                document.getElementById('transitionSubtitle').textContent='Thank You For Watching';
+                document.getElementById('transitionOverlay').classList.add('visible');
+            }
+            else if(a==='bumper'){
+                document.getElementById('bumperText').textContent=d.text||'';
+                document.getElementById('bumperOverlay').classList.add('visible');
+            }
+        }
+
+        function handleET(a,d){
+            const e=document.getElementById('eventTitle');
+            if(a==='show'){
+                document.getElementById('eventTitleText').textContent=d.name||'';
+                e.classList.add('visible');
+            } else e.classList.remove('visible');
+        }
+
+        function handleBG(d){
+            if(d && d.color){
+                const root=document.getElementById('scaled-root');
+                root.style.backgroundColor=d.color;
+                if(d.color!=='#0a0e17') document.body.classList.add('chroma-mode');
+                else document.body.classList.remove('chroma-mode');
+            }
+        }
+
+        function handleClear(){
+            ['timerContainer','lowerThird','teamIntro','awardDisplay','scoreDisplay','transitionOverlay','introOverlay','bumperOverlay','eventTitle','currentMatchBar','nextMatchOverlay'].forEach(id=>{
+                document.getElementById(id).classList.remove('visible');
+            });
+            timerVisible=false;
+        }
+
+        document.getElementById('timerValue').textContent='02:30';
+        socket.on('history-update', (history) => {
+            renderTicker(history);
+        });
+
+        function renderTicker(history) {
+            const container = document.getElementById('tickerContent');
+            if(history.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = history.map(m => {
+                let tablesHtml = m.tables.map(t => 
+                    `<span style="margin-right:20px;">
+                        <span style="color:var(--cyan); font-size:0.8rem; margin-right:5px;">${t.name}:</span>
+                        ${t.team1} <span class="ticker-score">${t.score1}</span> - <span class="ticker-score">${t.score2}</span> ${t.team2}
+                    </span>`
+                ).join('');
+                
+                return `<div class="ticker-item">
+                    <span class="ticker-match">M${m.match}</span>
+                    <div class="ticker-result">${tablesHtml}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function handleTicker(action, data) {
+            const el = document.getElementById('tickerWrap');
+            if(action === 'show') el.classList.add('visible');
+            else el.classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
