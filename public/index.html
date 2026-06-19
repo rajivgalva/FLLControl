@@ -209,9 +209,12 @@
                     <div class="panel-body" style="display: flex; flex-direction: column; gap: 12px;">
                         <div>
                             <label>Current Match Bar</label>
-                            <div class="btn-group" style="margin-top: 8px;">
-                                <button class="btn btn-cyan" id="mc-showCurrent">Show Current</button>
-                                <button class="btn btn-secondary" id="mc-hideCurrent">Hide Current</button>
+                            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                                <button class="btn btn-success" id="mc-currentBarToggle" style="width: 100%;">Current Bar: ON</button>
+                                <div class="btn-group">
+                                    <button class="btn btn-cyan" id="mc-showCurrent">Show</button>
+                                    <button class="btn btn-secondary" id="mc-hideCurrent">Hide</button>
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -589,6 +592,7 @@
         let upNextTimeout = null;
         let scoreVisible = false;
         let scoreEntryIndex = -1;
+        let currentBarEnabled = true; // toggle to permanently suppress the match bar
 
         // --- LOCAL STORAGE ---
         function saveState() {
@@ -619,6 +623,19 @@
 
         // Returns a human-readable label: "Match 11" or "Practice"
         function matchLabel(m) { return m.practice ? 'Practice' : `Match ${m.match}`; }
+
+        // Send currentMatch show only when the bar is enabled
+        function sendCurrentMatchShow(m) {
+            if (!currentBarEnabled) return;
+            send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+        }
+
+        function updateCurrentBarToggle() {
+            const btn = document.getElementById('mc-currentBarToggle');
+            if (!btn) return;
+            btn.textContent = currentBarEnabled ? 'Current Bar: ON' : 'Current Bar: OFF';
+            btn.className = currentBarEnabled ? 'btn btn-success' : 'btn btn-secondary';
+        }
 
         function updateMatchControlTab() {
             const label = document.getElementById('mc-matchLabel');
@@ -691,10 +708,10 @@
                 timerStatus.classList.add('active');
                 send('sound', 'play', { sound: 'start' });
 
-                // Show Current Match on Start
+                // Show Current Match on Start (respects bar toggle)
                 if (currentMatchIndex >= 0 && scheduleData[currentMatchIndex]) {
                     const m = scheduleData[currentMatchIndex];
-                    send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+                    sendCurrentMatchShow(m);
                 }
 
                 // Timestamp-based countdown — self-corrects every 100ms regardless
@@ -831,7 +848,7 @@
         document.getElementById('showCurrentMatch').onclick = () => {
              if (currentMatchIndex >= 0 && scheduleData[currentMatchIndex]) {
                 const m = scheduleData[currentMatchIndex];
-                send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+                sendCurrentMatchShow(m);
             } else { alert("No match selected."); }
         };
         document.getElementById('hideCurrentMatch').onclick = () => send('currentMatch', 'hide');
@@ -910,10 +927,10 @@
             send('nextMatchInterstitial', 'hide');
             isNextVisible = false;
 
-            // Show current match bar (already set to the upcoming match)
+            // Show current match bar (respects bar toggle)
             if (currentMatchIndex >= 0 && scheduleData[currentMatchIndex]) {
                 const m = scheduleData[currentMatchIndex];
-                send('currentMatch', 'show', { match: m.match, time: m.time, tables: m.tables });
+                sendCurrentMatchShow(m);
             }
 
             // Bring timer into view showing reset time
@@ -931,6 +948,12 @@
         document.getElementById('mc-hideTimer').onclick = () => send('timerVisibility', 'hide', { visible: false });
         document.getElementById('mc-showCurrent').onclick = () => document.getElementById('showCurrentMatch').click();
         document.getElementById('mc-hideCurrent').onclick = () => document.getElementById('hideCurrentMatch').click();
+        document.getElementById('mc-currentBarToggle').onclick = () => {
+            currentBarEnabled = !currentBarEnabled;
+            updateCurrentBarToggle();
+            // If turning off, immediately hide the bar
+            if (!currentBarEnabled) send('currentMatch', 'hide');
+        };
         document.getElementById('mc-showNext').onclick = () => document.getElementById('showNextMatch').click();
         document.getElementById('mc-hideNext').onclick = () => document.getElementById('hideNextMatch').click();
 
